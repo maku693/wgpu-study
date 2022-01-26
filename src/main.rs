@@ -47,12 +47,6 @@ async fn main() -> Result<(), Box<dyn error::Error>> {
 
     let shader_module = device.create_shader_module(&wgpu::include_wgsl!("main.wgsl"));
 
-    let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-        label: None,
-        bind_group_layouts: &[],
-        push_constant_ranges: &[],
-    });
-
     let vertices: [f32; 6] = [-1., -1., 0., 1., 1., -1.];
     let elements_per_vertex = 2;
     let num_vertices = (vertices.len() / elements_per_vertex) as u32;
@@ -76,7 +70,7 @@ async fn main() -> Result<(), Box<dyn error::Error>> {
 
     let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
         label: None,
-        layout: Some(&pipeline_layout),
+        layout: None,
         vertex: wgpu::VertexState {
             module: &shader_module,
             entry_point: "vs_main",
