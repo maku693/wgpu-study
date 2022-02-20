@@ -3,6 +3,5 @@ mod renderer;
 
 #[tokio::main]
 async fn main() {
-    let app = app::App::new().await;
-    app.run();
+    app::App::new().await.run();
 }

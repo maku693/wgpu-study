@@ -2,7 +2,7 @@ use crate::renderer;
 
 pub struct App {
     event_loop: winit::event_loop::EventLoop<()>,
-    _window: winit::window::Window,
+    window: winit::window::Window,
     renderer: renderer::Renderer,
 }
 
@@ -24,7 +24,7 @@ impl App {
 
         Self {
             event_loop,
-            _window: window,
+            window,
             renderer,
         }
     }
@@ -36,22 +36,18 @@ impl App {
                 event_loop::ControlFlow,
             };
 
-            *control_flow = ControlFlow::Wait;
+            *control_flow = ControlFlow::Poll;
 
             match e {
-                Event::WindowEvent {
-                    event: WindowEvent::CloseRequested,
-                    ..
-                } => {
-                    *control_flow = ControlFlow::Exit;
-                }
-                Event::WindowEvent {
-                    event: WindowEvent::Resized(size),
-                    ..
-                } => {
-                    self.renderer.configure_surface(size);
-                }
+                Event::WindowEvent { event, .. } => match event {
+                    WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
+                    WindowEvent::Resized(size) => self.renderer.configure_surface(size),
+                    _ => (),
+                },
                 Event::MainEventsCleared => {
+                    self.window.request_redraw();
+                }
+                Event::RedrawRequested(..) => {
                     self.renderer.render();
                 }
                 _ => (),

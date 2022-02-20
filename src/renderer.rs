@@ -41,17 +41,17 @@ impl Renderer {
             .await
             .expect("No device found");
 
-        let (num_vertices, vertex_buffer, render_pipeline) = {
-            let vertices: [f32; 6] = [-1., -1., 0., 1., 1., -1.];
-            let elements_per_vertex = 2;
-            let num_vertices = (vertices.len() / elements_per_vertex) as u32;
+        let elements_per_vertex = 2;
+        let vertices: [f32; 6] = [-1., -1., 0., 1., 1., -1.];
+        let num_vertices = (vertices.len() / elements_per_vertex) as u32;
 
-            let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: None,
-                contents: bytemuck::cast_slice(&vertices),
-                usage: wgpu::BufferUsages::VERTEX,
-            });
+        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: None,
+            contents: bytemuck::cast_slice(&vertices),
+            usage: wgpu::BufferUsages::VERTEX,
+        });
 
+        let render_pipeline = {
             let vertex_buffer_layouts = [wgpu::VertexBufferLayout {
                 array_stride: (std::mem::size_of::<f32>() * elements_per_vertex)
                     as wgpu::BufferAddress,
@@ -65,7 +65,7 @@ impl Renderer {
 
             let shader_module = device.create_shader_module(&wgpu::include_wgsl!("main.wgsl"));
 
-            let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
                 label: None,
                 layout: None,
                 vertex: wgpu::VertexState {
@@ -82,9 +82,7 @@ impl Renderer {
                 depth_stencil: None,
                 multisample: wgpu::MultisampleState::default(),
                 multiview: None,
-            });
-
-            (num_vertices, vertex_buffer, render_pipeline)
+            })
         };
 
         Renderer {
