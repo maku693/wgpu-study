@@ -1,5 +1,4 @@
 use crate::renderer;
-use pollster::FutureExt as _;
 
 pub struct App {
     event_loop: winit::event_loop::EventLoop<()>,
@@ -19,7 +18,7 @@ impl App {
             .build(&event_loop)
             .expect("Failed to build window");
 
-        let renderer = renderer::Renderer::new(&window).block_on();
+        let renderer = renderer::Renderer::new(&window);
         renderer.configure_surface(window.inner_size());
 
         Self {
