@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use cgmath::{prelude::*, vec2};
 use pollster::FutureExt as _;
 use wgpu::util::DeviceExt;
 use winit;
@@ -44,12 +45,13 @@ impl Renderer {
             .context("No device found")?;
 
         let elements_per_vertex = 2;
-        let vertices: [f32; 6] = [-1., -1., 0., 1., 1., -1.];
-        let num_vertices = (vertices.len() / elements_per_vertex) as u32;
+        let vertices = [vec2(-1., -1.), vec2(0., 1.), vec2(1., -1.)];
+        let num_vertices = vertices.len() as u32;
+        let contents: [[f32; 2]; 3] = vertices.map(|v| *v.as_ref());
 
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: None,
-            contents: bytemuck::cast_slice(&vertices),
+            contents: bytemuck::cast_slice(&contents),
             usage: wgpu::BufferUsages::VERTEX,
         });
 
