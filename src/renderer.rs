@@ -1,3 +1,4 @@
+use anyhow::{Context, Result};
 use pollster::FutureExt as _;
 use wgpu::util::DeviceExt;
 use winit;
@@ -13,7 +14,7 @@ pub struct Renderer {
 }
 
 impl Renderer {
-    pub fn new(window: &winit::window::Window) -> Self {
+    pub fn new(window: &winit::window::Window) -> Result<Self> {
         let instance = wgpu::Instance::new(wgpu::Backends::PRIMARY);
         let surface = unsafe { instance.create_surface(&window) };
 
@@ -24,11 +25,11 @@ impl Renderer {
                 force_fallback_adapter: false,
             })
             .block_on()
-            .expect("No adapter found");
+            .context("No adapter found")?;
 
         let surface_format = surface
             .get_preferred_format(&adapter)
-            .expect("Surface is incompatible with adapter");
+            .context("Surface is incompatible with the adapter")?;
 
         let (device, queue) = adapter
             .request_device(
@@ -40,7 +41,7 @@ impl Renderer {
                 None,
             )
             .block_on()
-            .expect("No device found");
+            .context("No device found")?;
 
         let elements_per_vertex = 2;
         let vertices: [f32; 6] = [-1., -1., 0., 1., 1., -1.];
@@ -86,7 +87,7 @@ impl Renderer {
             })
         };
 
-        Renderer {
+        Ok(Renderer {
             device,
             queue,
             surface,
@@ -94,7 +95,7 @@ impl Renderer {
             num_vertices,
             vertex_buffer,
             render_pipeline,
-        }
+        })
     }
 
     pub fn configure_surface(&self, size: winit::dpi::PhysicalSize<u32>) {

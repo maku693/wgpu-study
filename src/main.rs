@@ -1,6 +1,10 @@
+use anyhow::{Context, Result};
+
 mod app;
 mod renderer;
 
-fn main() {
-    app::App::new().run();
+fn main() -> Result<()> {
+    let app = app::App::new().context("failed to iniiatlize app")?;
+    app.run();
+    Ok(())
 }

@@ -1,3 +1,5 @@
+use anyhow::{Context, Result};
+
 use crate::renderer;
 
 pub struct App {
@@ -7,7 +9,7 @@ pub struct App {
 }
 
 impl App {
-    pub fn new() -> Self {
+    pub fn new() -> Result<Self> {
         let event_loop = winit::event_loop::EventLoop::new();
         let window = winit::window::WindowBuilder::new()
             .with_title("Hello, world!")
@@ -16,16 +18,16 @@ impl App {
                 height: 360,
             })
             .build(&event_loop)
-            .expect("Failed to build window");
+            .context("Failed to build window")?;
 
-        let renderer = renderer::Renderer::new(&window);
+        let renderer = renderer::Renderer::new(&window)?;
         renderer.configure_surface(window.inner_size());
 
-        Self {
+        Ok(Self {
             event_loop,
             window,
             renderer,
-        }
+        })
     }
 
     pub fn run(self) {
