@@ -9,6 +9,7 @@ edition = "2021"
 anyhow = "1"
 bytemuck = "1"
 cgmath = { git = "https://github.com/maku693/cgmath", rev = "1f373a", features = ["bytemuck"] }
+env_logger = "0.9"
 pollster = "0.2"
 wgpu = "0.12"
 winit = "0.26"
