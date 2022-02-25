@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use cgmath::vec2;
+use cgmath::vec3;
 use pollster::FutureExt as _;
 use wgpu::util::DeviceExt;
 use winit;
@@ -44,8 +44,7 @@ impl Renderer {
             .block_on()
             .context("No device found")?;
 
-        let elements_per_vertex = 2;
-        let vertices = [vec2(-1f32, -1.), vec2(0., 1.), vec2(1., -1.)];
+        let vertices = [vec3(-1f32, -1., 0.), vec3(0., 1., 0.), vec3(1., -1., 0.)];
         let num_vertices = vertices.len() as u32;
 
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -56,11 +55,10 @@ impl Renderer {
 
         let render_pipeline = {
             let vertex_buffer_layouts = [wgpu::VertexBufferLayout {
-                array_stride: (std::mem::size_of::<f32>() * elements_per_vertex)
-                    as wgpu::BufferAddress,
+                array_stride: std::mem::size_of_val(&vertices[0]) as wgpu::BufferAddress,
                 step_mode: wgpu::VertexStepMode::Vertex,
                 attributes: &[wgpu::VertexAttribute {
-                    format: wgpu::VertexFormat::Float32x2,
+                    format: wgpu::VertexFormat::Float32x3,
                     offset: 0,
                     shader_location: 0,
                 }],
