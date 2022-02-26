@@ -11,6 +11,8 @@ pub struct Renderer {
     queue: wgpu::Queue,
     num_vertices: u32,
     vertex_buffer: wgpu::Buffer,
+    num_instances: u32,
+    instance_buffer: wgpu::Buffer,
     render_pipeline: wgpu::RenderPipeline,
 }
 
@@ -44,7 +46,11 @@ impl Renderer {
             .block_on()
             .context("No device found")?;
 
-        let vertices = [vec3(-1f32, -1., 0.), vec3(0., 1., 0.), vec3(1., -1., 0.)];
+        let vertices = [
+            vec3(-0.1f32, -0.1, 0.),
+            vec3(0., 0.1, 0.),
+            vec3(0.1, -0.1, 0.),
+        ];
         let num_vertices = vertices.len() as u32;
 
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -53,16 +59,36 @@ impl Renderer {
             usage: wgpu::BufferUsages::VERTEX,
         });
 
+        let instances = [vec3(0f32, 0., 0.), vec3(-0.5, 0., 0.), vec3(0.5, 0., 0.)];
+        let num_instances = instances.len() as u32;
+
+        let instance_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: None,
+            contents: bytemuck::cast_slice(&instances),
+            usage: wgpu::BufferUsages::VERTEX,
+        });
+
         let render_pipeline = {
-            let vertex_buffer_layouts = [wgpu::VertexBufferLayout {
-                array_stride: std::mem::size_of_val(&vertices[0]) as wgpu::BufferAddress,
-                step_mode: wgpu::VertexStepMode::Vertex,
-                attributes: &[wgpu::VertexAttribute {
-                    format: wgpu::VertexFormat::Float32x3,
-                    offset: 0,
-                    shader_location: 0,
-                }],
-            }];
+            let vertex_buffer_layouts = [
+                wgpu::VertexBufferLayout {
+                    array_stride: std::mem::size_of_val(&vertices[0]) as wgpu::BufferAddress,
+                    step_mode: wgpu::VertexStepMode::Vertex,
+                    attributes: &[wgpu::VertexAttribute {
+                        format: wgpu::VertexFormat::Float32x3,
+                        offset: 0,
+                        shader_location: 0,
+                    }],
+                },
+                wgpu::VertexBufferLayout {
+                    array_stride: std::mem::size_of_val(&instances[0]) as wgpu::BufferAddress,
+                    step_mode: wgpu::VertexStepMode::Instance,
+                    attributes: &[wgpu::VertexAttribute {
+                        format: wgpu::VertexFormat::Float32x3,
+                        offset: 0,
+                        shader_location: 1,
+                    }],
+                },
+            ];
 
             let shader_module = device.create_shader_module(&wgpu::include_wgsl!("main.wgsl"));
 
@@ -93,6 +119,8 @@ impl Renderer {
             surface_format,
             num_vertices,
             vertex_buffer,
+            num_instances,
+            instance_buffer,
             render_pipeline,
         })
     }
@@ -138,7 +166,8 @@ impl Renderer {
             });
             render_pass.set_pipeline(&self.render_pipeline);
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-            render_pass.draw(0..self.num_vertices, 0..1);
+            render_pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
+            render_pass.draw(0..self.num_vertices, 0..self.num_instances);
         }
 
         self.queue.submit(Some(encoder.finish()));
