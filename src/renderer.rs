@@ -55,7 +55,7 @@ impl Renderer {
 
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: None,
-            contents: bytemuck::cast_slice(&vertices),
+            contents: bytemuck::bytes_of(&vertices),
             usage: wgpu::BufferUsages::VERTEX,
         });
 
@@ -64,7 +64,7 @@ impl Renderer {
 
         let instance_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: None,
-            contents: bytemuck::cast_slice(&instances),
+            contents: bytemuck::bytes_of(&instances),
             usage: wgpu::BufferUsages::VERTEX,
         });
 
