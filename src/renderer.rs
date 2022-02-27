@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use cgmath::vec3;
+use cgmath::{ortho, vec3};
 use pollster::FutureExt as _;
 use wgpu::util::DeviceExt;
 use winit;
@@ -13,6 +13,7 @@ pub struct Renderer {
     vertex_buffer: wgpu::Buffer,
     num_instances: u32,
     instance_buffer: wgpu::Buffer,
+    bind_group: wgpu::BindGroup,
     render_pipeline: wgpu::RenderPipeline,
 }
 
@@ -112,6 +113,31 @@ impl Renderer {
             })
         };
 
+        let proj_matrix = ortho(-1f32, 1., -1., 1., -1., 1.);
+
+        let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: None,
+            contents: bytemuck::bytes_of(&proj_matrix),
+            usage: wgpu::BufferUsages::UNIFORM,
+        });
+
+        let bind_group = {
+            let layout = render_pipeline.get_bind_group_layout(0);
+
+            device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: None,
+                layout: &layout,
+                entries: &[wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                        buffer: &uniform_buffer,
+                        offset: 0,
+                        size: None,
+                    }),
+                }],
+            })
+        };
+
         Ok(Renderer {
             device,
             queue,
@@ -121,6 +147,7 @@ impl Renderer {
             vertex_buffer,
             num_instances,
             instance_buffer,
+            bind_group,
             render_pipeline,
         })
     }
@@ -164,6 +191,7 @@ impl Renderer {
                 }],
                 depth_stencil_attachment: None,
             });
+            render_pass.set_bind_group(0, &self.bind_group, &[]);
             render_pass.set_pipeline(&self.render_pipeline);
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
             render_pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
