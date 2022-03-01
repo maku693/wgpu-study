@@ -21,9 +21,7 @@ fn main() -> Result<()> {
         .build(&event_loop)
         .context("Failed to build window")?;
 
-    let renderer = renderer::Renderer::new(&window)?;
-
-    renderer.configure_surface(window.inner_size());
+    let mut renderer = renderer::Renderer::new(&window)?;
 
     event_loop.run(move |e, _, control_flow| {
         use winit::{

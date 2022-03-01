@@ -7,8 +7,10 @@ use winit;
 pub struct Renderer {
     surface: wgpu::Surface,
     surface_format: wgpu::TextureFormat,
+    surface_size: wgpu::Extent3d,
     device: wgpu::Device,
     queue: wgpu::Queue,
+    render_target: wgpu::Texture,
     num_vertices: u32,
     vertex_buffer: wgpu::Buffer,
     num_instances: u32,
@@ -46,6 +48,17 @@ impl Renderer {
             )
             .block_on()
             .context("No device found")?;
+
+        let window_size = window.inner_size();
+
+        configure_surface(&surface, &device, surface_format, window_size);
+
+        let surface_size = wgpu::Extent3d {
+            width: window_size.width,
+            height: window_size.height,
+            depth_or_array_layers: 1,
+        };
+        let render_target = create_render_target(&device, surface_size, surface_format);
 
         let vertices = [
             vec3(-0.1f32, -0.1, 0.),
@@ -143,6 +156,8 @@ impl Renderer {
             queue,
             surface,
             surface_format,
+            surface_size,
+            render_target,
             num_vertices,
             vertex_buffer,
             num_instances,
@@ -152,17 +167,15 @@ impl Renderer {
         })
     }
 
-    pub fn configure_surface(&self, size: winit::dpi::PhysicalSize<u32>) {
-        self.surface.configure(
-            &self.device,
-            &wgpu::SurfaceConfiguration {
-                usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-                format: self.surface_format,
-                width: size.width,
-                height: size.height,
-                present_mode: wgpu::PresentMode::Fifo,
-            },
-        );
+    pub fn configure_surface(&mut self, size: winit::dpi::PhysicalSize<u32>) {
+        configure_surface(&self.surface, &self.device, self.surface_format, size);
+        self.surface_size = wgpu::Extent3d {
+            width: size.width,
+            height: size.height,
+            depth_or_array_layers: 1,
+        };
+        self.render_target =
+            create_render_target(&self.device, self.surface_size, self.surface_format);
     }
 
     pub fn render(&self) {
@@ -170,8 +183,9 @@ impl Renderer {
             .surface
             .get_current_texture()
             .expect("Failed to get next surface texture");
-        let frame_view = frame
-            .texture
+
+        let render_target_view = self
+            .render_target
             .create_view(&wgpu::TextureViewDescriptor::default());
 
         let mut encoder = self
@@ -182,7 +196,7 @@ impl Renderer {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: None,
                 color_attachments: &[wgpu::RenderPassColorAttachment {
-                    view: &frame_view,
+                    view: &render_target_view,
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
@@ -198,8 +212,48 @@ impl Renderer {
             render_pass.draw(0..self.num_vertices, 0..self.num_instances);
         }
 
+        encoder.copy_texture_to_texture(
+            self.render_target.as_image_copy(),
+            frame.texture.as_image_copy(),
+            self.surface_size,
+        );
+
         self.queue.submit(Some(encoder.finish()));
 
         frame.present();
     }
+}
+
+fn configure_surface(
+    surface: &wgpu::Surface,
+    device: &wgpu::Device,
+    format: wgpu::TextureFormat,
+    size: winit::dpi::PhysicalSize<u32>,
+) {
+    surface.configure(
+        device,
+        &wgpu::SurfaceConfiguration {
+            usage: wgpu::TextureUsages::COPY_DST,
+            format,
+            width: size.width,
+            height: size.height,
+            present_mode: wgpu::PresentMode::Fifo,
+        },
+    );
+}
+
+fn create_render_target(
+    device: &wgpu::Device,
+    size: wgpu::Extent3d,
+    format: wgpu::TextureFormat,
+) -> wgpu::Texture {
+    device.create_texture(&wgpu::TextureDescriptor {
+        label: None,
+        size,
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format,
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+    })
 }
