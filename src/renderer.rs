@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use cgmath::{ortho, vec3};
+use glam::{vec3, Mat4};
 use pollster::FutureExt as _;
 use wgpu::util::DeviceExt;
 use winit;
@@ -113,7 +113,7 @@ impl Renderer {
             })
         };
 
-        let proj_matrix = ortho(-1f32, 1., -1., 1., -1., 1.);
+        let proj_matrix = Mat4::orthographic_lh(-1f32, 1., -1., 1., 0., 1.);
 
         let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: None,

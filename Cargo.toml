@@ -8,12 +8,11 @@ edition = "2021"
 [dependencies]
 anyhow = "1"
 bytemuck = "1"
-cgmath = { version = "0.18", features = ["bytemuck"] }
 env_logger = "0.9"
+glam = { version = "0.20", features = ["bytemuck"] }
 pollster = "0.2"
 wgpu = "0.12"
 winit = "0.26"
 
 [patch.crates-io]
 wgpu = { git = "https://github.com/gfx-rs/wgpu", branch = "master" }
-cgmath = { git = "https://github.com/maku693/cgmath", branch = "master" }
