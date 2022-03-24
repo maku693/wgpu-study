@@ -77,6 +77,41 @@ fn main() -> Result<()> {
         usage: wgpu::BufferUsages::VERTEX,
     });
 
+    let proj_matrix = Mat4::orthographic_lh(-1f32, 1., -1., 1., 0., 1.);
+
+    let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: None,
+        contents: bytemuck::bytes_of(&proj_matrix),
+        usage: wgpu::BufferUsages::UNIFORM,
+    });
+
+    let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        label: None,
+        entries: &[wgpu::BindGroupLayoutEntry {
+            binding: 0,
+            visibility: wgpu::ShaderStages::VERTEX,
+            ty: wgpu::BindingType::Buffer {
+                ty: wgpu::BufferBindingType::Uniform,
+                has_dynamic_offset: false,
+                min_binding_size: wgpu::BufferSize::new(std::mem::size_of_val(&proj_matrix) as u64),
+            },
+            count: None,
+        }],
+    });
+
+    let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: None,
+        layout: &bind_group_layout,
+        entries: &[wgpu::BindGroupEntry {
+            binding: 0,
+            resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                buffer: &uniform_buffer,
+                offset: 0,
+                size: None,
+            }),
+        }],
+    });
+
     let render_pipeline = {
         let vertex_buffer_layouts = [
             wgpu::VertexBufferLayout {
@@ -101,9 +136,15 @@ fn main() -> Result<()> {
 
         let shader_module = device.create_shader_module(&wgpu::include_wgsl!("main.wgsl"));
 
+        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: None,
+            bind_group_layouts: &[&bind_group_layout],
+            push_constant_ranges: &[],
+        });
+
         device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: None,
-            layout: None,
+            layout: Some(&pipeline_layout),
             vertex: wgpu::VertexState {
                 module: &shader_module,
                 entry_point: "vs_main",
@@ -118,31 +159,6 @@ fn main() -> Result<()> {
             depth_stencil: None,
             multisample: wgpu::MultisampleState::default(),
             multiview: None,
-        })
-    };
-
-    let proj_matrix = Mat4::orthographic_lh(-1f32, 1., -1., 1., 0., 1.);
-
-    let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: None,
-        contents: bytemuck::bytes_of(&proj_matrix),
-        usage: wgpu::BufferUsages::UNIFORM,
-    });
-
-    let bind_group = {
-        let layout = render_pipeline.get_bind_group_layout(0);
-
-        device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: None,
-            layout: &layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-                    buffer: &uniform_buffer,
-                    offset: 0,
-                    size: None,
-                }),
-            }],
         })
     };
 
