@@ -52,8 +52,8 @@ fn main() -> Result<()> {
         .get_preferred_format(&adapter)
         .context("Surface is incompatible with the adapter")?;
 
-    let (mut surface_size, mut render_target) =
-        on_surface_size_changed(window.inner_size(), &device, &surface, surface_format);
+    let (mut render_target, mut surface_size) =
+        handle_surface_size_changed(&device, &surface, surface_format, window.inner_size());
 
     let vertices = [
         vec3(-0.1f32, -0.1, 0.),
@@ -174,12 +174,16 @@ fn main() -> Result<()> {
             Event::WindowEvent { event, .. } => match event {
                 WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
                 WindowEvent::Resized(size) => {
-                    (surface_size, render_target) =
-                        on_surface_size_changed(size, &device, &surface, surface_format);
+                    (render_target, surface_size) =
+                        handle_surface_size_changed(&device, &surface, surface_format, size);
                 }
                 WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
-                    (surface_size, render_target) =
-                        on_surface_size_changed(*new_inner_size, &device, &surface, surface_format);
+                    (render_target, surface_size) = handle_surface_size_changed(
+                        &device,
+                        &surface,
+                        surface_format,
+                        *new_inner_size,
+                    );
                 }
                 _ => (),
             },
@@ -232,12 +236,12 @@ fn main() -> Result<()> {
     });
 }
 
-fn on_surface_size_changed(
-    size: winit::dpi::PhysicalSize<u32>,
+fn handle_surface_size_changed(
     device: &wgpu::Device,
     surface: &wgpu::Surface,
     surface_format: wgpu::TextureFormat,
-) -> (wgpu::Extent3d, wgpu::Texture) {
+    size: winit::dpi::PhysicalSize<u32>,
+) -> (wgpu::Texture, wgpu::Extent3d) {
     let surface_size = wgpu::Extent3d {
         width: size.width,
         height: size.height,
@@ -264,5 +268,5 @@ fn on_surface_size_changed(
         },
     );
 
-    return (surface_size, render_target);
+    return (render_target, surface_size);
 }
