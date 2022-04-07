@@ -9,16 +9,11 @@ fn main() -> Result<()> {
 
     let event_loop = winit::event_loop::EventLoop::new();
 
-    let monitor_size = &event_loop
-        .primary_monitor()
-        .context("Failed to get primary monitor")?
-        .size();
-
     let window = winit::window::WindowBuilder::new()
         .with_title("Hello, world!")
-        .with_inner_size(winit::dpi::PhysicalSize {
-            width: monitor_size.width / 2,
-            height: monitor_size.height / 2,
+        .with_inner_size(winit::dpi::LogicalSize {
+            width: 640,
+            height: 360,
         })
         .build(&event_loop)
         .context("Failed to build window")?;
