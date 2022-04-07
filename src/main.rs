@@ -11,7 +11,7 @@ fn main() -> Result<()> {
 
     let window = winit::window::WindowBuilder::new()
         .with_title("Hello, world!")
-        .with_inner_size(winit::dpi::LogicalSize {
+        .with_inner_size(winit::dpi::LogicalSize::<u32> {
             width: 640,
             height: 360,
         })
@@ -31,6 +31,10 @@ fn main() -> Result<()> {
         .block_on()
         .context("No adapter found")?;
 
+    let surface_format = surface
+        .get_preferred_format(&adapter)
+        .context("There is no preferred format")?;
+
     let (device, queue) = adapter
         .request_device(
             &wgpu::DeviceDescriptor {
@@ -43,12 +47,7 @@ fn main() -> Result<()> {
         .block_on()
         .context("No device found")?;
 
-    let surface_format = surface
-        .get_preferred_format(&adapter)
-        .context("Surface is incompatible with the adapter")?;
-
-    let (mut render_target, mut surface_size) =
-        handle_surface_size_changed(&device, &surface, surface_format, window.inner_size());
+    configure_surface(&device, &surface, surface_format, window.inner_size())?;
 
     let vertices = [
         vec3(-0.1f32, -0.1, 0.),
@@ -169,16 +168,10 @@ fn main() -> Result<()> {
             Event::WindowEvent { event, .. } => match event {
                 WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
                 WindowEvent::Resized(size) => {
-                    (render_target, surface_size) =
-                        handle_surface_size_changed(&device, &surface, surface_format, size);
+                    configure_surface(&device, &surface, surface_format, size).unwrap();
                 }
                 WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
-                    (render_target, surface_size) = handle_surface_size_changed(
-                        &device,
-                        &surface,
-                        surface_format,
-                        *new_inner_size,
-                    );
+                    configure_surface(&device, &surface, surface_format, *new_inner_size).unwrap();
                 }
                 _ => (),
             },
@@ -186,12 +179,13 @@ fn main() -> Result<()> {
                 window.request_redraw();
             }
             Event::RedrawRequested(..) => {
-                let frame = surface
+                let frame_buffer = surface
                     .get_current_texture()
                     .expect("Failed to get next surface texture");
 
-                let render_target_view =
-                    render_target.create_view(&wgpu::TextureViewDescriptor::default());
+                let frame_buffer_view = frame_buffer
+                    .texture
+                    .create_view(&wgpu::TextureViewDescriptor::default());
 
                 let mut encoder =
                     device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
@@ -200,7 +194,7 @@ fn main() -> Result<()> {
                     let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                         label: None,
                         color_attachments: &[wgpu::RenderPassColorAttachment {
-                            view: &render_target_view,
+                            view: &frame_buffer_view,
                             resolve_target: None,
                             ops: wgpu::Operations {
                                 load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
@@ -216,46 +210,25 @@ fn main() -> Result<()> {
                     render_pass.draw(0..num_vertices, 0..num_instances);
                 }
 
-                encoder.copy_texture_to_texture(
-                    render_target.as_image_copy(),
-                    frame.texture.as_image_copy(),
-                    surface_size,
-                );
-
                 queue.submit(Some(encoder.finish()));
 
-                frame.present();
+                frame_buffer.present();
             }
             _ => (),
         }
     });
 }
 
-fn handle_surface_size_changed(
+fn configure_surface(
     device: &wgpu::Device,
     surface: &wgpu::Surface,
     surface_format: wgpu::TextureFormat,
     size: winit::dpi::PhysicalSize<u32>,
-) -> (wgpu::Texture, wgpu::Extent3d) {
-    let surface_size = wgpu::Extent3d {
-        width: size.width,
-        height: size.height,
-        depth_or_array_layers: 1,
-    };
-    let render_target = device.create_texture(&wgpu::TextureDescriptor {
-        label: None,
-        size: surface_size,
-        mip_level_count: 1,
-        sample_count: 1,
-        dimension: wgpu::TextureDimension::D2,
-        format: surface_format,
-        usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
-    });
-
+) -> Result<()> {
     surface.configure(
         device,
         &wgpu::SurfaceConfiguration {
-            usage: wgpu::TextureUsages::COPY_DST,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format: surface_format,
             width: size.width,
             height: size.height,
@@ -263,5 +236,5 @@ fn handle_surface_size_changed(
         },
     );
 
-    return (render_target, surface_size);
+    Ok(())
 }
