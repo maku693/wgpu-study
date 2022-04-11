@@ -1,3 +1,9 @@
+use std::{
+    sync::{Arc, RwLock},
+    thread::sleep,
+    time::Duration,
+};
+
 use anyhow::{Context, Result};
 use pollster::FutureExt;
 use winit;
@@ -18,7 +24,15 @@ fn main() -> Result<()> {
         .build(&event_loop)
         .context("Failed to build window")?;
 
-    let mut renderer = renderer::Renderer::new(&window).block_on()?;
+    let renderer = Arc::new(RwLock::new(renderer::Renderer::new(&window).block_on()?));
+
+    {
+        let renderer = renderer.clone();
+        std::thread::spawn(move || loop {
+            renderer.read().unwrap().poll_device();
+            sleep(Duration::from_millis(100));
+        });
+    }
 
     event_loop.run(move |e, _, control_flow| {
         use winit::{
@@ -32,10 +46,10 @@ fn main() -> Result<()> {
             Event::WindowEvent { event, .. } => match event {
                 WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
                 WindowEvent::Resized(size) => {
-                    renderer.resize_surface(size);
+                    renderer.write().unwrap().resize_surface(size);
                 }
                 WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
-                    renderer.resize_surface(*new_inner_size);
+                    renderer.write().unwrap().resize_surface(*new_inner_size);
                 }
                 _ => (),
             },
@@ -43,7 +57,7 @@ fn main() -> Result<()> {
                 window.request_redraw();
             }
             Event::RedrawRequested(..) => {
-                renderer.render();
+                renderer.read().unwrap().render();
             }
             _ => (),
         }

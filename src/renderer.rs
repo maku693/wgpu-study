@@ -229,4 +229,8 @@ impl Renderer {
         self.surface
             .configure(&self.device, &self.surface_configuration)
     }
+
+    pub fn poll_device(&self) {
+        self.device.poll(wgpu::Maintain::Poll);
+    }
 }
