@@ -10,6 +10,7 @@ anyhow = "1"
 bytemuck = "1"
 env_logger = "0.9"
 glam = { version = "0.20", features = ["bytemuck"] }
+log = "0.4"
 pollster = "0.2"
 wgpu = "0.12"
 winit = "0.26"

@@ -30,6 +30,7 @@ dependencies = [
  "bytemuck",
  "env_logger",
  "glam",
+ "log",
  "pollster",
  "wgpu",
  "winit",
