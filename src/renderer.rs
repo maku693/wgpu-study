@@ -1,8 +1,8 @@
 use std::mem::size_of_val;
 
 use anyhow::{Context, Ok, Result};
-use bytemuck::bytes_of;
-use glam::{vec3, Mat4};
+use bytemuck::{bytes_of, from_bytes};
+use glam::{vec3, Mat3, Mat4, Vec3};
 use wgpu::util::DeviceExt;
 
 pub struct Renderer {
@@ -81,8 +81,11 @@ impl Renderer {
         let instance_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: None,
             contents: bytes_of(&instances),
-            usage: wgpu::BufferUsages::VERTEX,
+            usage: wgpu::BufferUsages::VERTEX
+                | wgpu::BufferUsages::MAP_READ
+                | wgpu::BufferUsages::MAP_WRITE,
         });
+
         let num_instances = instances.len() as u32;
 
         let proj_matrix = Mat4::orthographic_lh(-1f32, 1., -1., 1., 0., 1.);
@@ -184,7 +187,26 @@ impl Renderer {
         })
     }
 
-    pub fn render(&self) {
+    pub async fn render(&self) -> Result<()> {
+        let instance_buffer = &self.instance_buffer;
+        let instance_buffer_slice = instance_buffer.slice(..);
+
+        instance_buffer_slice.map_async(wgpu::MapMode::Read).await?;
+        let mut matrices =
+            from_bytes::<[Vec3; 3]>(&instance_buffer_slice.get_mapped_range()).clone();
+        for m in matrices.iter_mut() {
+            m.x += 0.01;
+        }
+        instance_buffer.unmap();
+
+        instance_buffer_slice
+            .map_async(wgpu::MapMode::Write)
+            .await?;
+        instance_buffer_slice
+            .get_mapped_range_mut()
+            .copy_from_slice(bytes_of(&matrices));
+        instance_buffer.unmap();
+
         let frame_buffer = self
             .surface
             .get_current_texture()
@@ -221,6 +243,8 @@ impl Renderer {
         self.queue.submit(Some(encoder.finish()));
 
         frame_buffer.present();
+
+        Ok(())
     }
 
     pub fn resize_surface(&mut self, size: winit::dpi::PhysicalSize<u32>) {
