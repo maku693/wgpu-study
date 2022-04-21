@@ -22,8 +22,8 @@ impl CameraExt for entity::Camera {
     }
 
     fn view_matrix(&self) -> Mat4 {
-        let center = self.rotation.mul_vec3(vec3(0., 0., 1.));
-        let up = vec3(0., 1., 0.);
+        let center = self.rotation.mul_vec3(Vec3::Z);
+        let up = Vec3::Y;
         Mat4::look_at_lh(self.position, center, up)
     }
 }

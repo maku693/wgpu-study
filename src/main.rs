@@ -5,7 +5,7 @@ use std::{
 };
 
 use anyhow::{Context, Result};
-use glam::{vec3, Quat};
+use glam::{vec3, Quat, Vec3};
 use log::debug;
 use pollster::FutureExt;
 use winit;
@@ -47,7 +47,7 @@ fn main() -> Result<()> {
             }
         },
         particle_system: particles::entity::ParticleSystem {
-            position: vec3(0., 0., 0.),
+            position: Vec3::ZERO,
             rotation: Quat::IDENTITY,
             num_particles: 32,
         },
