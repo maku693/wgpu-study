@@ -1,14 +1,15 @@
 use std::{
+    f32::consts::PI,
     sync::{Arc, RwLock},
     thread::sleep,
     time::Duration,
 };
 
 use anyhow::{Context, Result};
-use glam::{vec3, Quat, Vec3};
+use glam::{vec3, EulerRot, Quat, Vec3};
 use log::{debug, info};
 use pollster::FutureExt;
-use winit;
+use winit::{self, event::DeviceEvent};
 
 mod particles;
 mod renderer;
@@ -29,11 +30,14 @@ fn main() -> Result<()> {
         .build(&event_loop)
         .context("Failed to build window")?;
 
+    window.set_cursor_grab(true)?;
+    window.set_cursor_visible(false);
+
     let renderer = Arc::new(RwLock::new(
         renderer::Renderer::new(&instance, &window).block_on()?,
     ));
 
-    let scene = particles::entity::Scene {
+    let mut scene = particles::entity::Scene {
         camera: {
             let inner_size = window.inner_size();
             let aspect_ratio = inner_size.width as f32 / inner_size.height as f32;
@@ -68,13 +72,12 @@ fn main() -> Result<()> {
         )
     };
 
-    {
-        std::thread::spawn(move || loop {
-            instance.poll_all(true);
-            sleep(Duration::from_millis(100));
-        });
-    }
+    std::thread::spawn(move || loop {
+        instance.poll_all(true);
+        sleep(Duration::from_millis(1));
+    });
 
+    let mut rotation = (0.0, 0.0);
     event_loop.run(move |e, _, control_flow| {
         use winit::{
             event::{Event, WindowEvent},
@@ -93,6 +96,16 @@ fn main() -> Result<()> {
                 }
                 WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
                     renderer.write().unwrap().resize_surface(*new_inner_size);
+                }
+                _ => (),
+            },
+            Event::DeviceEvent { event, .. } => match event {
+                DeviceEvent::MouseMotion { delta: (x, y) } => {
+                    rotation.0 += x as f32 * 0.001;
+                    rotation.1 = (rotation.1 + y as f32 * 0.001).clamp(PI * -0.5, PI * 0.5);
+                    debug!("rotation: {}, {}", rotation.0, rotation.1);
+                    scene.camera.rotation =
+                        Quat::from_euler(glam::EulerRot::YXZ, rotation.0, rotation.1, 0.);
                 }
                 _ => (),
             },
