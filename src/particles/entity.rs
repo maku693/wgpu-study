@@ -20,5 +20,9 @@ pub struct Camera {
 pub struct ParticleSystem {
     pub position: Vec3,
     pub rotation: Quat,
-    pub num_particles: u32,
+    pub scale: Vec3,
+    pub max_count: u32,
+    pub lifetime: u32,
+    pub min_speed: f32,
+    pub max_speed: f32,
 }

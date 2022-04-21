@@ -6,7 +6,7 @@ use std::{
 
 use anyhow::{Context, Result};
 use glam::{vec3, Quat, Vec3};
-use log::debug;
+use log::{debug, info};
 use pollster::FutureExt;
 use winit;
 
@@ -49,11 +49,15 @@ fn main() -> Result<()> {
         particle_system: particles::entity::ParticleSystem {
             position: Vec3::ZERO,
             rotation: Quat::IDENTITY,
-            num_particles: 32,
+            scale: Vec3::ONE,
+            max_count: 1000,
+            lifetime: 0,
+            min_speed: 0.1,
+            max_speed: 1.,
         },
     };
 
-    debug!("{:#?}", &scene);
+    info!("{:#?}", &scene);
 
     let pipeline = {
         let renderer = renderer.read().unwrap();

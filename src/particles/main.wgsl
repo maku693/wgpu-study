@@ -24,7 +24,7 @@ fn vs_main(
 ) -> VertexOut {
     var instance = instances[instance_index];
     var out: VertexOut;
-    out.position = uniforms.mvp_matrix * vec4<f32>(position, 1.0) + vec4<f32>(instance.position, 1.0);
+    out.position = uniforms.mvp_matrix * (vec4<f32>(position, 1.0) + vec4<f32>(instance.position, 1.0));
     out.color = vec4<f32>(instance.color, 1.0);
     return out;
 }

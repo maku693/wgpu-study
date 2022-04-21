@@ -1,9 +1,11 @@
-use std::mem::size_of;
+use std::{mem::size_of, time::SystemTime};
 
 use anyhow::Result;
 use bytemuck::{bytes_of, cast_slice, Pod, Zeroable};
 use glam::{const_vec3, vec3, Mat4, Vec3};
-use log::debug;
+use log::{debug, info};
+use rand::prelude::*;
+use rand_pcg::Pcg64Mcg;
 use wgpu::util::DeviceExt;
 
 use crate::renderer;
@@ -34,7 +36,7 @@ trait ParticleSystemExt {
 
 impl ParticleSystemExt for entity::ParticleSystem {
     fn model_matrix(&self) -> Mat4 {
-        Mat4::from_rotation_translation(self.rotation, self.position)
+        Mat4::from_scale_rotation_translation(self.scale, self.rotation, self.position)
     }
 }
 
@@ -137,13 +139,28 @@ impl PipelineState {
     }
 
     fn make_instance_buffer(device: &wgpu::Device, scene: &entity::Scene) -> wgpu::Buffer {
-        let instances = vec![
-            Instance {
-                color: vec3(1., 1., 1.),
+        let unix_milli = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as _;
+        info!("Seeded RNG with {}", unix_milli);
+        let mut rng = Pcg64Mcg::seed_from_u64(unix_milli);
+
+        let instances: Vec<_> = (0..scene.particle_system.max_count)
+            .map(|_| Instance {
+                position: vec3(
+                    rng.gen_range(-1.0..1.0) * 100.0,
+                    rng.gen_range(-1.0..1.0) * 100.0,
+                    rng.gen_range(-1.0..1.0) * 100.0,
+                ),
+                color: vec3(
+                    rng.gen_range(0.5..1.0),
+                    rng.gen_range(0.5..1.0),
+                    rng.gen_range(0.5..1.0),
+                ),
                 ..Default::default()
-            };
-            scene.particle_system.num_particles as _
-        ];
+            })
+            .collect();
         device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Instance buffer"),
             contents: cast_slice(instances.as_slice()),
@@ -277,7 +294,7 @@ impl PipelineState {
         encoder.draw_indexed(
             0..(Self::PARTICLE_INDICES.len() as _),
             0,
-            0..scene.particle_system.num_particles,
+            0..scene.particle_system.max_count,
         );
 
         encoder.finish(&wgpu::RenderBundleDescriptor { label: None })
