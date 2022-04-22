@@ -8,37 +8,8 @@ use rand::prelude::*;
 use rand_pcg::Pcg64Mcg;
 use wgpu::util::DeviceExt;
 
-use crate::renderer;
-
 use super::entity;
-
-trait CameraExt {
-    fn proj_matrix(&self) -> Mat4;
-    fn view_matrix(&self) -> Mat4;
-}
-
-impl CameraExt for entity::Camera {
-    fn proj_matrix(&self) -> Mat4 {
-        let fovy = self.fov / self.aspect_ratio / 180.;
-        Mat4::perspective_lh(fovy, self.aspect_ratio, self.near, self.far)
-    }
-
-    fn view_matrix(&self) -> Mat4 {
-        let center = self.position + self.rotation * Vec3::Z;
-        let up = Vec3::Y;
-        Mat4::look_at_lh(self.position, center, up)
-    }
-}
-
-trait ParticleSystemExt {
-    fn model_matrix(&self) -> Mat4;
-}
-
-impl ParticleSystemExt for entity::ParticleSystem {
-    fn model_matrix(&self) -> Mat4 {
-        Mat4::from_scale_rotation_translation(self.scale, self.rotation, self.position)
-    }
-}
+use crate::renderer;
 
 #[derive(Debug, Copy, Clone, Default, Pod, Zeroable)]
 #[repr(C)]
@@ -48,10 +19,30 @@ struct Uniforms {
 
 impl Uniforms {
     fn new(scene: &entity::Scene) -> Self {
+        let entity::Scene {
+            camera,
+            particle_system,
+        } = scene;
+
+        let proj_matrix = {
+            let fovy = camera.fov / camera.aspect_ratio / 180.;
+            Mat4::perspective_lh(fovy, camera.aspect_ratio, camera.near, camera.far)
+        };
+
+        let view_matrix = {
+            let center = camera.position + camera.rotation * Vec3::Z;
+            let up = Vec3::Y;
+            Mat4::look_at_lh(camera.position, center, up)
+        };
+
+        let model_matrix = Mat4::from_scale_rotation_translation(
+            particle_system.scale,
+            particle_system.rotation,
+            particle_system.position,
+        );
+
         Self {
-            mvp_matrix: scene.camera.proj_matrix()
-                * scene.camera.view_matrix()
-                * scene.particle_system.model_matrix(),
+            mvp_matrix: proj_matrix * view_matrix * model_matrix,
         }
     }
 }
@@ -275,7 +266,11 @@ impl PipelineState {
                 depth_write_enabled: true,
                 depth_compare: wgpu::CompareFunction::LessEqual,
                 stencil: wgpu::StencilState::default(),
-                bias: wgpu::DepthBiasState::default(),
+                bias: wgpu::DepthBiasState {
+                    constant: 1,
+                    slope_scale: 1.0,
+                    clamp: 0.0,
+                },
             }),
             multisample: wgpu::MultisampleState::default(),
             multiview: None,
