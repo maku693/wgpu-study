@@ -22,7 +22,7 @@ fn main() -> Result<()> {
     let instance = wgpu::Instance::new(wgpu::Backends::PRIMARY);
 
     let window = winit::window::WindowBuilder::new()
-        .with_title("Hello, world!")
+        .with_title("antimodern")
         .with_inner_size(winit::dpi::LogicalSize::<u32> {
             width: 640,
             height: 360,
