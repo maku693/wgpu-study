@@ -65,16 +65,19 @@ fn main() -> Result<()> {
         camera: {
             let inner_size = window.inner_size();
             let aspect_ratio = inner_size.width as f32 / inner_size.height as f32;
-            let position = vec3(1., 0.1, -2.) * 5.0;
-            let rotation = Quat::from_axis_angle(Vec3::Y, PI * -0.15);
             cube::entity::Camera {
-                position,
-                rotation,
+                position: vec3(0., 0., -2.) * 5.0,
+                rotation: Quat::IDENTITY,
                 fov: 60.,
                 aspect_ratio,
                 near: 0.,
                 far: 1000.,
             }
+        },
+        cube: cube::entity::Cube {
+            position: Vec3::ZERO,
+            rotation: Quat::from_axis_angle(Vec3::X, PI * -0.125),
+            scale: Vec3::ONE,
         },
     };
 
@@ -137,6 +140,7 @@ fn main() -> Result<()> {
                 window.request_redraw();
             }
             Event::RedrawRequested(..) => {
+                scene.cube.rotation *= Quat::from_axis_angle(Vec3::Y, PI * 0.01);
                 pipeline.update(&scene).block_on().unwrap();
                 renderer.read().unwrap().render(&pipeline);
             }

@@ -18,7 +18,7 @@ struct Uniforms {
 
 impl Uniforms {
     fn new(scene: &entity::Scene) -> Self {
-        let entity::Scene { camera } = scene;
+        let entity::Scene { camera, cube } = scene;
 
         let proj_matrix = {
             let fovy = camera.fov / camera.aspect_ratio / 180.;
@@ -31,7 +31,7 @@ impl Uniforms {
             Mat4::look_at_lh(camera.position, center, up)
         };
 
-        let model_matrix = Mat4::IDENTITY;
+        let model_matrix = Mat4::from_scale_rotation_translation(cube.scale, cube.rotation, cube.position);
 
         Self {
             mvp_matrix: proj_matrix * view_matrix * model_matrix,
