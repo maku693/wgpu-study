@@ -19,7 +19,7 @@ trait CameraExt {
 
 impl CameraExt for entity::Camera {
     fn proj_matrix(&self) -> Mat4 {
-        let fovy = self.fov / self.aspect_ratio;
+        let fovy = self.fov / self.aspect_ratio / 180.;
         Mat4::perspective_lh(fovy, self.aspect_ratio, self.near, self.far)
     }
 

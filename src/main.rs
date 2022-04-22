@@ -9,7 +9,6 @@ use anyhow::{Context, Result};
 use glam::{vec3, EulerRot, Quat, Vec3};
 use log::{debug, info};
 use pollster::FutureExt;
-use winit::{self, event::DeviceEvent};
 
 mod particles;
 mod renderer;
@@ -42,7 +41,7 @@ fn main() -> Result<()> {
             let inner_size = window.inner_size();
             let aspect_ratio = inner_size.width as f32 / inner_size.height as f32;
             particles::entity::Camera {
-                position: vec3(0., 0., -10.),
+                position: vec3(0., 0., -100.),
                 rotation: Quat::IDENTITY,
                 fov: 60.,
                 aspect_ratio,
@@ -54,7 +53,7 @@ fn main() -> Result<()> {
             position: Vec3::ZERO,
             rotation: Quat::IDENTITY,
             scale: Vec3::ONE,
-            max_count: 1000,
+            max_count: 1000000,
             lifetime: 0,
             min_speed: 0.1,
             max_speed: 1.,
@@ -80,7 +79,7 @@ fn main() -> Result<()> {
     let mut rotation = (0.0, 0.0);
     event_loop.run(move |e, _, control_flow| {
         use winit::{
-            event::{Event, WindowEvent},
+            event::{DeviceEvent, Event, MouseScrollDelta, WindowEvent},
             event_loop::ControlFlow,
         };
 
@@ -106,6 +105,12 @@ fn main() -> Result<()> {
                     debug!("rotation: {}, {}", rotation.0, rotation.1);
                     scene.camera.rotation =
                         Quat::from_euler(glam::EulerRot::YXZ, rotation.0, rotation.1, 0.);
+                }
+                DeviceEvent::MouseWheel {
+                    delta: MouseScrollDelta::PixelDelta(delta),
+                } => {
+                    scene.camera.fov = (scene.camera.fov + delta.y as f32 * -0.1).clamp(30., 90.);
+                    debug!("fov: {:?}", scene.camera.fov);
                 }
                 _ => (),
             },
