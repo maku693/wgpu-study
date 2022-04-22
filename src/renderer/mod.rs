@@ -1,5 +1,8 @@
 use anyhow::{Context, Ok, Result};
 
+pub mod cube;
+pub mod particles;
+
 pub struct Renderer {
     surface: wgpu::Surface,
     surface_format: wgpu::TextureFormat,
@@ -11,10 +14,7 @@ pub struct Renderer {
 }
 
 impl Renderer {
-    pub async fn new(
-        instance: &wgpu::Instance,
-        window: &winit::window::Window,
-    ) -> Result<Renderer> {
+    pub async fn new(instance: &wgpu::Instance, window: &winit::window::Window) -> Result<Self> {
         let surface = unsafe { instance.create_surface(window) };
 
         let adapter = instance
@@ -59,7 +59,7 @@ impl Renderer {
             array_layer_count: None,
         });
 
-        Ok(Renderer {
+        Ok(Self {
             surface,
             surface_format,
             device,
@@ -130,10 +130,11 @@ impl Renderer {
         &self.device
     }
 
-    pub fn render<P>(&self, pipeline: &P)
-    where
-        P: Pipeline,
-    {
+    pub fn render(
+        &self,
+        cube_pipeline: &cube::PipelineState,
+        particle_pipeline: &particles::PipelineState,
+    ) {
         let frame_buffer = self
             .surface
             .get_current_texture()
@@ -163,7 +164,9 @@ impl Renderer {
                     stencil_ops: None,
                 }),
             });
-            pipeline.render(&mut render_pass);
+
+            cube_pipeline.render(&mut render_pass);
+            particle_pipeline.render(&mut render_pass);
         }
 
         self.queue.submit(Some(encoder.finish()));

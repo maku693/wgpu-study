@@ -1,12 +1,10 @@
 use glam::{Quat, Vec3};
 
-use crate::{cube, particles};
-
 #[derive(Debug, Copy, Clone, Default)]
 pub struct Scene {
     pub camera: Camera,
-    pub cube: cube::entity::Cube,
-    pub particle_system: particles::entity::ParticleSystem,
+    pub cube: Cube,
+    pub particle_system: ParticleSystem,
 }
 
 #[derive(Debug, Copy, Clone, Default)]
@@ -17,4 +15,22 @@ pub struct Camera {
     pub aspect_ratio: f32,
     pub near: f32,
     pub far: f32,
+}
+
+#[derive(Debug, Copy, Clone, Default)]
+pub struct Cube {
+    pub position: Vec3,
+    pub rotation: Quat,
+    pub scale: Vec3,
+}
+
+#[derive(Debug, Copy, Clone, Default)]
+pub struct ParticleSystem {
+    pub position: Vec3,
+    pub rotation: Quat,
+    pub scale: Vec3,
+    pub max_count: u32,
+    pub lifetime: u32,
+    pub min_speed: f32,
+    pub max_speed: f32,
 }

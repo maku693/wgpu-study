@@ -1,18 +1,11 @@
-use std::{
-    f32::consts::PI,
-    sync::{Arc, RwLock},
-    thread::sleep,
-    time::Duration,
-};
+use std::{f32::consts::PI, thread::sleep, time::Duration};
 
 use anyhow::{Context, Result};
 use glam::{vec3, EulerRot, Quat, Vec3};
 use log::{debug, info};
 use pollster::FutureExt;
 
-mod cube;
 mod entity;
-mod particles;
 mod renderer;
 
 fn main() -> Result<()> {
@@ -49,12 +42,12 @@ fn main() -> Result<()> {
                 far: 1000.,
             }
         },
-        cube: cube::entity::Cube {
+        cube: entity::Cube {
             position: Vec3::ZERO,
             rotation: Quat::from_axis_angle(Vec3::X, PI * -0.125),
             scale: Vec3::ONE,
         },
-        particle_system: particles::entity::ParticleSystem {
+        particle_system: entity::ParticleSystem {
             position: Vec3::ZERO,
             rotation: Quat::IDENTITY,
             scale: Vec3::ONE,
@@ -67,14 +60,14 @@ fn main() -> Result<()> {
 
     info!("{:#?}", &scene);
 
-    let cube_pipeline = cube::pipeline::PipelineState::new(
+    let cube_pipeline = renderer::cube::PipelineState::new(
         renderer.device(),
         renderer.surface_format(),
         renderer.depth_texture_format(),
         &scene,
     );
 
-    let particle_pipeline = particles::pipeline::PipelineState::new(
+    let particle_pipeline = renderer::particles::PipelineState::new(
         renderer.device(),
         renderer.surface_format(),
         renderer.depth_texture_format(),
@@ -131,10 +124,9 @@ fn main() -> Result<()> {
                 scene.cube.rotation *= Quat::from_axis_angle(Vec3::Y, PI * 0.01);
 
                 cube_pipeline.update(&scene).block_on().unwrap();
-                renderer.render(&cube_pipeline);
-
                 particle_pipeline.update(&scene).block_on().unwrap();
-                renderer.render(&particle_pipeline);
+
+                renderer.render(&cube_pipeline, &particle_pipeline);
             }
             _ => (),
         }
