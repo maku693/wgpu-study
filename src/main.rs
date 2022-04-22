@@ -11,6 +11,7 @@ use log::{debug, info};
 use pollster::FutureExt;
 
 mod cube;
+mod entity;
 mod particles;
 mod renderer;
 
@@ -33,39 +34,13 @@ fn main() -> Result<()> {
     window.set_cursor_grab(true)?;
     window.set_cursor_visible(false);
 
-    let renderer = Arc::new(RwLock::new(
-        renderer::Renderer::new(&instance, &window).block_on()?,
-    ));
+    let mut renderer = renderer::Renderer::new(&instance, &window).block_on()?;
 
-    // let mut scene = particles::entity::Scene {
-    //     camera: {
-    //         let inner_size = window.inner_size();
-    //         let aspect_ratio = inner_size.width as f32 / inner_size.height as f32;
-    //         particles::entity::Camera {
-    //             position: vec3(0., 0., 0.),
-    //             rotation: Quat::IDENTITY,
-    //             fov: 60.,
-    //             aspect_ratio,
-    //             near: 0.,
-    //             far: 1000.,
-    //         }
-    //     },
-    //     particle_system: particles::entity::ParticleSystem {
-    //         position: Vec3::ZERO,
-    //         rotation: Quat::IDENTITY,
-    //         scale: Vec3::ONE,
-    //         max_count: 10000,
-    //         lifetime: 0,
-    //         min_speed: 0.1,
-    //         max_speed: 1.,
-    //     },
-    // };
-
-    let mut scene = cube::entity::Scene {
+    let mut scene = entity::Scene {
         camera: {
             let inner_size = window.inner_size();
             let aspect_ratio = inner_size.width as f32 / inner_size.height as f32;
-            cube::entity::Camera {
+            entity::Camera {
                 position: vec3(0., 0., -2.) * 5.0,
                 rotation: Quat::IDENTITY,
                 fov: 60.,
@@ -79,19 +54,32 @@ fn main() -> Result<()> {
             rotation: Quat::from_axis_angle(Vec3::X, PI * -0.125),
             scale: Vec3::ONE,
         },
+        particle_system: particles::entity::ParticleSystem {
+            position: Vec3::ZERO,
+            rotation: Quat::IDENTITY,
+            scale: Vec3::ONE,
+            max_count: 10000,
+            lifetime: 0,
+            min_speed: 0.1,
+            max_speed: 1.,
+        },
     };
 
     info!("{:#?}", &scene);
 
-    let pipeline = {
-        let renderer = renderer.read().unwrap();
-        cube::pipeline::PipelineState::new(
-            renderer.device(),
-            renderer.surface_format(),
-            renderer.depth_texture_format(),
-            &scene,
-        )
-    };
+    let cube_pipeline = cube::pipeline::PipelineState::new(
+        renderer.device(),
+        renderer.surface_format(),
+        renderer.depth_texture_format(),
+        &scene,
+    );
+
+    let particle_pipeline = particles::pipeline::PipelineState::new(
+        renderer.device(),
+        renderer.surface_format(),
+        renderer.depth_texture_format(),
+        &scene,
+    );
 
     std::thread::spawn(move || loop {
         instance.poll_all(true);
@@ -112,10 +100,10 @@ fn main() -> Result<()> {
             Event::WindowEvent { event, .. } => match event {
                 WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
                 WindowEvent::Resized(size) => {
-                    renderer.write().unwrap().resize(size);
+                    renderer.resize(size);
                 }
                 WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
-                    renderer.write().unwrap().resize(*new_inner_size);
+                    renderer.resize(*new_inner_size);
                 }
                 _ => (),
             },
@@ -141,8 +129,12 @@ fn main() -> Result<()> {
             }
             Event::RedrawRequested(..) => {
                 scene.cube.rotation *= Quat::from_axis_angle(Vec3::Y, PI * 0.01);
-                pipeline.update(&scene).block_on().unwrap();
-                renderer.read().unwrap().render(&pipeline);
+
+                cube_pipeline.update(&scene).block_on().unwrap();
+                renderer.render(&cube_pipeline);
+
+                particle_pipeline.update(&scene).block_on().unwrap();
+                renderer.render(&particle_pipeline);
             }
             _ => (),
         }

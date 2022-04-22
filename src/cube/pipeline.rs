@@ -7,8 +7,7 @@ use log::debug;
 
 use wgpu::util::DeviceExt;
 
-use super::entity;
-use crate::renderer;
+use crate::{renderer, entity};
 
 #[derive(Debug, Copy, Clone, Default, Pod, Zeroable)]
 #[repr(C)]
@@ -18,7 +17,7 @@ struct Uniforms {
 
 impl Uniforms {
     fn new(scene: &entity::Scene) -> Self {
-        let entity::Scene { camera, cube } = scene;
+        let entity::Scene { camera, cube, .. } = scene;
 
         let proj_matrix = {
             let fovy = camera.fov / camera.aspect_ratio / 180.;

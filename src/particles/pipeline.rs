@@ -8,8 +8,7 @@ use rand::prelude::*;
 use rand_pcg::Pcg64Mcg;
 use wgpu::util::DeviceExt;
 
-use super::entity;
-use crate::renderer;
+use crate::{entity, renderer};
 
 #[derive(Debug, Copy, Clone, Default, Pod, Zeroable)]
 #[repr(C)]
@@ -22,6 +21,7 @@ impl Uniforms {
         let entity::Scene {
             camera,
             particle_system,
+            ..
         } = scene;
 
         let proj_matrix = {
