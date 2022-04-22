@@ -86,6 +86,7 @@ impl PipelineState {
     pub fn new(
         device: &wgpu::Device,
         render_target_color_format: wgpu::TextureFormat,
+        render_target_depth_format: wgpu::TextureFormat,
         scene: &entity::Scene,
     ) -> Self {
         let uniform_buffer = Self::make_uniform_buffer(device, scene);
@@ -100,12 +101,17 @@ impl PipelineState {
             &uniform_buffer,
             &instance_buffer,
         );
-        let render_pipeline =
-            Self::make_render_pipeline(device, render_target_color_format, &bind_group_layout);
+        let render_pipeline = Self::make_render_pipeline(
+            device,
+            &bind_group_layout,
+            render_target_color_format,
+            render_target_depth_format,
+        );
 
         let render_bundle = Self::make_render_bundle(
             device,
             render_target_color_format,
+            render_target_depth_format,
             &render_pipeline,
             &bind_group,
             &vertex_buffer,
@@ -230,8 +236,9 @@ impl PipelineState {
 
     fn make_render_pipeline(
         device: &wgpu::Device,
-        render_target_format: wgpu::TextureFormat,
         bind_group_layout: &wgpu::BindGroupLayout,
+        render_target_color_format: wgpu::TextureFormat,
+        render_target_depth_format: wgpu::TextureFormat,
     ) -> wgpu::RenderPipeline {
         let shader_module = device.create_shader_module(&wgpu::include_wgsl!("main.wgsl"));
 
@@ -260,10 +267,16 @@ impl PipelineState {
             fragment: Some(wgpu::FragmentState {
                 module: &shader_module,
                 entry_point: "fs_main",
-                targets: &[render_target_format.into()],
+                targets: &[render_target_color_format.into()],
             }),
             primitive: wgpu::PrimitiveState::default(),
-            depth_stencil: None,
+            depth_stencil: Some(wgpu::DepthStencilState {
+                format: render_target_depth_format,
+                depth_write_enabled: true,
+                depth_compare: wgpu::CompareFunction::LessEqual,
+                stencil: wgpu::StencilState::default(),
+                bias: wgpu::DepthBiasState::default(),
+            }),
             multisample: wgpu::MultisampleState::default(),
             multiview: None,
         })
@@ -272,6 +285,7 @@ impl PipelineState {
     fn make_render_bundle(
         device: &wgpu::Device,
         render_target_color_format: wgpu::TextureFormat,
+        render_target_depth_format: wgpu::TextureFormat,
         render_pipeline: &wgpu::RenderPipeline,
         bind_group: &wgpu::BindGroup,
         vertex_buffer: &wgpu::Buffer,
@@ -282,7 +296,11 @@ impl PipelineState {
             device.create_render_bundle_encoder(&wgpu::RenderBundleEncoderDescriptor {
                 label: None,
                 color_formats: &[render_target_color_format],
-                depth_stencil: None,
+                depth_stencil: Some(wgpu::RenderBundleDepthStencil {
+                    format: render_target_depth_format,
+                    depth_read_only: false,
+                    stencil_read_only: true,
+                }),
                 sample_count: 1,
                 multiview: None,
             });

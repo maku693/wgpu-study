@@ -67,6 +67,7 @@ fn main() -> Result<()> {
         particles::pipeline::PipelineState::new(
             renderer.device(),
             renderer.surface_format(),
+            renderer.depth_texture_format(),
             &scene,
         )
     };
@@ -90,10 +91,10 @@ fn main() -> Result<()> {
             Event::WindowEvent { event, .. } => match event {
                 WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
                 WindowEvent::Resized(size) => {
-                    renderer.write().unwrap().resize_surface(size);
+                    renderer.write().unwrap().resize(size);
                 }
                 WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
-                    renderer.write().unwrap().resize_surface(*new_inner_size);
+                    renderer.write().unwrap().resize(*new_inner_size);
                 }
                 _ => (),
             },
