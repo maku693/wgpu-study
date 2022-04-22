@@ -76,7 +76,6 @@ fn main() -> Result<()> {
         sleep(Duration::from_millis(1));
     });
 
-    let mut rotation = (0.0, 0.0);
     event_loop.run(move |e, _, control_flow| {
         use winit::{
             event::{DeviceEvent, Event, MouseScrollDelta, WindowEvent},
@@ -100,11 +99,12 @@ fn main() -> Result<()> {
             },
             Event::DeviceEvent { event, .. } => match event {
                 DeviceEvent::MouseMotion { delta: (x, y) } => {
+                    let mut rotation = scene.camera.rotation.to_euler(EulerRot::YXZ);
                     rotation.0 += x as f32 * 0.001;
                     rotation.1 = (rotation.1 + y as f32 * 0.001).clamp(PI * -0.5, PI * 0.5);
-                    debug!("rotation: {}, {}", rotation.0, rotation.1);
+                    debug!("rotation: {:?}", rotation);
                     scene.camera.rotation =
-                        Quat::from_euler(glam::EulerRot::YXZ, rotation.0, rotation.1, 0.);
+                        Quat::from_euler(glam::EulerRot::YXZ, rotation.0, rotation.1, rotation.2);
                 }
                 DeviceEvent::MouseWheel {
                     delta: MouseScrollDelta::PixelDelta(delta),
