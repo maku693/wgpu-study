@@ -10,6 +10,7 @@ use glam::{vec3, EulerRot, Quat, Vec3};
 use log::{debug, info};
 use pollster::FutureExt;
 
+mod cube;
 mod particles;
 mod renderer;
 
@@ -36,27 +37,44 @@ fn main() -> Result<()> {
         renderer::Renderer::new(&instance, &window).block_on()?,
     ));
 
-    let mut scene = particles::entity::Scene {
+    // let mut scene = particles::entity::Scene {
+    //     camera: {
+    //         let inner_size = window.inner_size();
+    //         let aspect_ratio = inner_size.width as f32 / inner_size.height as f32;
+    //         particles::entity::Camera {
+    //             position: vec3(0., 0., 0.),
+    //             rotation: Quat::IDENTITY,
+    //             fov: 60.,
+    //             aspect_ratio,
+    //             near: 0.,
+    //             far: 1000.,
+    //         }
+    //     },
+    //     particle_system: particles::entity::ParticleSystem {
+    //         position: Vec3::ZERO,
+    //         rotation: Quat::IDENTITY,
+    //         scale: Vec3::ONE,
+    //         max_count: 10000,
+    //         lifetime: 0,
+    //         min_speed: 0.1,
+    //         max_speed: 1.,
+    //     },
+    // };
+
+    let mut scene = cube::entity::Scene {
         camera: {
             let inner_size = window.inner_size();
             let aspect_ratio = inner_size.width as f32 / inner_size.height as f32;
-            particles::entity::Camera {
-                position: vec3(0., 0., 0.),
-                rotation: Quat::IDENTITY,
+            let position = vec3(1., 0.1, -2.) * 5.0;
+            let rotation = Quat::from_axis_angle(Vec3::Y, PI * -0.15);
+            cube::entity::Camera {
+                position,
+                rotation,
                 fov: 60.,
                 aspect_ratio,
                 near: 0.,
                 far: 1000.,
             }
-        },
-        particle_system: particles::entity::ParticleSystem {
-            position: Vec3::ZERO,
-            rotation: Quat::IDENTITY,
-            scale: Vec3::ONE,
-            max_count: 10000,
-            lifetime: 0,
-            min_speed: 0.1,
-            max_speed: 1.,
         },
     };
 
@@ -64,7 +82,7 @@ fn main() -> Result<()> {
 
     let pipeline = {
         let renderer = renderer.read().unwrap();
-        particles::pipeline::PipelineState::new(
+        cube::pipeline::PipelineState::new(
             renderer.device(),
             renderer.surface_format(),
             renderer.depth_texture_format(),
