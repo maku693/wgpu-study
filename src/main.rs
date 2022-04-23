@@ -31,7 +31,7 @@ fn main() -> Result<()> {
             let inner_size = window.inner_size();
             let aspect_ratio = inner_size.width as f32 / inner_size.height as f32;
             entity::Camera {
-                position: vec3(0., 0., -10.),
+                position: Vec3::ZERO,
                 rotation: Quat::IDENTITY,
                 fov: 60.,
                 aspect_ratio,
@@ -40,7 +40,7 @@ fn main() -> Result<()> {
             }
         },
         cube: entity::Cube {
-            position: Vec3::ZERO,
+            position: vec3(0., 0., 10.),
             rotation: Quat::from_axis_angle(Vec3::X, PI * -0.125),
             scale: Vec3::ONE,
         },
