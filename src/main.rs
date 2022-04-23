@@ -38,7 +38,7 @@ fn main() -> Result<()> {
                 rotation: Quat::IDENTITY,
                 fov: 60.,
                 aspect_ratio,
-                near: 0.,
+                near: 0.1,
                 far: 1000.,
             }
         },
