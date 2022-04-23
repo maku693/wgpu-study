@@ -24,9 +24,6 @@ fn main() -> Result<()> {
         .build(&event_loop)
         .context("Failed to build window")?;
 
-    window.set_cursor_grab(true)?;
-    window.set_cursor_visible(false);
-
     let mut renderer = renderer::Renderer::new(&instance, &window).block_on()?;
 
     let mut scene = entity::Scene {
@@ -34,7 +31,7 @@ fn main() -> Result<()> {
             let inner_size = window.inner_size();
             let aspect_ratio = inner_size.width as f32 / inner_size.height as f32;
             entity::Camera {
-                position: vec3(0., 0., -2.) * 5.0,
+                position: vec3(0., 0., -10.),
                 rotation: Quat::IDENTITY,
                 fov: 60.,
                 aspect_ratio,
@@ -79,9 +76,14 @@ fn main() -> Result<()> {
         sleep(Duration::from_millis(1));
     });
 
+    let mut cursor_locked = false;
+
     event_loop.run(move |e, _, control_flow| {
         use winit::{
-            event::{DeviceEvent, Event, MouseScrollDelta, WindowEvent},
+            event::{
+                DeviceEvent, ElementState, Event, KeyboardInput, MouseButton, MouseScrollDelta,
+                VirtualKeyCode, WindowEvent,
+            },
             event_loop::ControlFlow,
         };
 
@@ -98,10 +100,35 @@ fn main() -> Result<()> {
                 WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
                     renderer.resize(*new_inner_size);
                 }
+                WindowEvent::MouseInput {
+                    state: ElementState::Released,
+                    button: MouseButton::Left,
+                    ..
+                } => {
+                    window.set_cursor_grab(true).unwrap();
+                    window.set_cursor_visible(false);
+                    cursor_locked = true;
+                }
+                WindowEvent::KeyboardInput {
+                    input:
+                        KeyboardInput {
+                            state: ElementState::Released,
+                            virtual_keycode: Some(VirtualKeyCode::Escape),
+                            ..
+                        },
+                    ..
+                } => {
+                    window.set_cursor_grab(false).unwrap();
+                    window.set_cursor_visible(true);
+                    cursor_locked = false;
+                }
                 _ => (),
             },
             Event::DeviceEvent { event, .. } => match event {
                 DeviceEvent::MouseMotion { delta: (x, y) } => {
+                    if !cursor_locked {
+                        return;
+                    };
                     let mut rotation = scene.camera.rotation.to_euler(EulerRot::YXZ);
                     rotation.0 += x as f32 * 0.001;
                     rotation.1 = (rotation.1 + y as f32 * 0.001).clamp(PI * -0.5, PI * 0.5);
@@ -112,7 +139,10 @@ fn main() -> Result<()> {
                 DeviceEvent::MouseWheel {
                     delta: MouseScrollDelta::PixelDelta(delta),
                 } => {
-                    scene.camera.fov = (scene.camera.fov + delta.y as f32 * -0.1).clamp(30., 90.);
+                    if !cursor_locked {
+                        return;
+                    };
+                    scene.camera.fov = (scene.camera.fov + delta.y as f32 * -0.1).clamp(30., 120.);
                     debug!("fov: {:?}", scene.camera.fov);
                 }
                 _ => (),
