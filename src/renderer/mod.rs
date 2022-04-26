@@ -10,11 +10,12 @@ pub struct Renderer {
     device: wgpu::Device,
     queue: wgpu::Queue,
     depth_texture: wgpu::Texture,
-    depth_texture_format: wgpu::TextureFormat,
     depth_texture_view: wgpu::TextureView,
 }
 
 impl Renderer {
+    const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
+
     pub async fn new(instance: &wgpu::Instance, window: &winit::window::Window) -> Result<Self> {
         let surface = unsafe { instance.create_surface(window) };
 
@@ -46,12 +47,10 @@ impl Renderer {
             .context("There is no preferred format")?;
         Self::configure_surface(&surface, &device, surface_format, width, height);
 
-        let depth_texture_format = wgpu::TextureFormat::Depth32Float;
-        let depth_texture =
-            Self::create_depth_texture(&device, depth_texture_format, width, height);
+        let depth_texture = Self::create_depth_texture(&device, Self::DEPTH_FORMAT, width, height);
         let depth_texture_view = depth_texture.create_view(&wgpu::TextureViewDescriptor {
             label: Some("Depth texture view"),
-            format: Some(depth_texture_format),
+            format: Some(Self::DEPTH_FORMAT),
             dimension: Some(wgpu::TextureViewDimension::D2),
             aspect: wgpu::TextureAspect::DepthOnly,
             base_mip_level: 0,
@@ -66,7 +65,6 @@ impl Renderer {
             device,
             queue,
             depth_texture,
-            depth_texture_format,
             depth_texture_view,
         })
     }
@@ -111,20 +109,12 @@ impl Renderer {
         })
     }
 
-    pub fn surface(&self) -> &wgpu::Surface {
-        &self.surface
-    }
-
     pub fn surface_format(&self) -> wgpu::TextureFormat {
         self.surface_format
     }
 
-    pub fn depth_texture(&self) -> &wgpu::Texture {
-        &self.depth_texture
-    }
-
     pub fn depth_texture_format(&self) -> wgpu::TextureFormat {
-        self.depth_texture_format
+        Self::DEPTH_FORMAT
     }
 
     pub fn device(&self) -> &wgpu::Device {
@@ -176,12 +166,11 @@ impl Renderer {
             device,
             surface_format,
             depth_texture,
-            depth_texture_format,
             ..
         } = self;
         Self::configure_surface(surface, device, *surface_format, size.width, size.height);
         *depth_texture =
-            Self::create_depth_texture(device, *depth_texture_format, size.width, size.height);
+            Self::create_depth_texture(device, Self::DEPTH_FORMAT, size.width, size.height);
     }
 }
 
