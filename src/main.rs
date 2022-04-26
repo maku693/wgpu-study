@@ -71,11 +71,19 @@ fn main() -> Result<()> {
         &scene,
     );
 
+    let billboard_pipeline = renderer::billboard::PipelineState::new(
+        renderer.device(),
+        renderer.surface_format(),
+        renderer.depth_texture_format(),
+        &scene,
+    );
+
     std::thread::spawn(move || loop {
         instance.poll_all(true);
         sleep(Duration::from_millis(1));
     });
 
+    let mut current_sample = 3;
     let mut cursor_locked = false;
 
     event_loop.run(move |e, _, control_flow| {
@@ -113,15 +121,27 @@ fn main() -> Result<()> {
                     input:
                         KeyboardInput {
                             state: ElementState::Released,
-                            virtual_keycode: Some(VirtualKeyCode::Escape),
+                            virtual_keycode,
                             ..
                         },
                     ..
-                } => {
-                    window.set_cursor_grab(false).unwrap();
-                    window.set_cursor_visible(true);
-                    cursor_locked = false;
-                }
+                } => match virtual_keycode {
+                    Some(VirtualKeyCode::Escape) => {
+                        window.set_cursor_grab(false).unwrap();
+                        window.set_cursor_visible(true);
+                        cursor_locked = false;
+                    }
+                    Some(VirtualKeyCode::Key1) => {
+                        current_sample = 1;
+                    }
+                    Some(VirtualKeyCode::Key2) => {
+                        current_sample = 2;
+                    }
+                    Some(VirtualKeyCode::Key3) => {
+                        current_sample = 3;
+                    }
+                    _ => (),
+                },
                 _ => (),
             },
             Event::DeviceEvent { event, .. } => match event {
@@ -155,8 +175,14 @@ fn main() -> Result<()> {
 
                 cube_pipeline.update(&scene).block_on().unwrap();
                 particle_pipeline.update(&scene).block_on().unwrap();
+                billboard_pipeline.update(&scene).block_on().unwrap();
 
-                renderer.render(&cube_pipeline, &particle_pipeline);
+                match current_sample {
+                    1 => renderer.render(&particle_pipeline),
+                    2 => renderer.render(&cube_pipeline),
+                    3 => renderer.render(&billboard_pipeline),
+                    _ => (),
+                };
             }
             _ => (),
         }

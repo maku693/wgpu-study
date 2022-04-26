@@ -1,5 +1,6 @@
 use anyhow::{Context, Ok, Result};
 
+pub mod billboard;
 pub mod cube;
 pub mod particles;
 
@@ -130,11 +131,7 @@ impl Renderer {
         &self.device
     }
 
-    pub fn render(
-        &self,
-        cube_pipeline: &cube::PipelineState,
-        particle_pipeline: &particles::PipelineState,
-    ) {
+    pub fn render(&self, pipeline: &impl Pipeline) {
         let frame_buffer = self
             .surface
             .get_current_texture()
@@ -165,8 +162,7 @@ impl Renderer {
                 }),
             });
 
-            cube_pipeline.render(&mut render_pass);
-            particle_pipeline.render(&mut render_pass);
+            pipeline.render(&mut render_pass);
         }
 
         self.queue.submit(Some(encoder.finish()));
