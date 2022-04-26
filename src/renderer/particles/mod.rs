@@ -33,15 +33,15 @@ impl Uniforms {
         };
 
         let v_mat = {
-            let center = camera.position + camera.rotation * Vec3::Z;
+            let center = camera.transform.position + camera.transform.rotation * Vec3::Z;
             let up = Vec3::Y;
-            Mat4::look_at_lh(camera.position, center, up)
+            Mat4::look_at_lh(camera.transform.position, center, up)
         };
 
         let m_mat = Mat4::from_scale_rotation_translation(
-            particle_system.scale,
-            particle_system.rotation,
-            particle_system.position,
+            particle_system.transform.scale,
+            particle_system.transform.rotation,
+            particle_system.transform.position,
         );
 
         Self {

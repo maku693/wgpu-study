@@ -28,12 +28,16 @@ impl Uniforms {
         };
 
         let v_mat = Mat4::look_at_lh(
-            camera.position,
-            camera.position + camera.rotation * Vec3::Z,
+            camera.transform.position,
+            camera.transform.position + camera.transform.rotation * Vec3::Z,
             Vec3::Y,
         );
 
-        let m_mat = Mat4::from_scale_rotation_translation(cube.scale, cube.rotation, cube.position);
+        let m_mat = Mat4::from_scale_rotation_translation(
+            cube.transform.scale,
+            cube.transform.rotation,
+            cube.transform.position,
+        );
 
         Self {
             mvp_matrix: p_mat * v_mat * m_mat,

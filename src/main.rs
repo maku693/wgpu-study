@@ -31,8 +31,11 @@ fn main() -> Result<()> {
             let inner_size = window.inner_size();
             let aspect_ratio = inner_size.width as f32 / inner_size.height as f32;
             entity::Camera {
-                position: Vec3::ZERO,
-                rotation: Quat::IDENTITY,
+                transform: entity::Transform {
+                    position: Vec3::ZERO,
+                    rotation: Quat::IDENTITY,
+                    ..Default::default()
+                },
                 fov: 60.,
                 aspect_ratio,
                 near: 0.1,
@@ -40,14 +43,18 @@ fn main() -> Result<()> {
             }
         },
         cube: entity::Cube {
-            position: vec3(0., 0., 10.),
-            rotation: Quat::from_axis_angle(Vec3::X, PI * -0.125),
-            scale: Vec3::ONE,
+            transform: entity::Transform {
+                position: vec3(0., 0., 10.),
+                rotation: Quat::from_axis_angle(Vec3::X, PI * -0.125),
+                scale: Vec3::ONE,
+            },
         },
         particle_system: entity::ParticleSystem {
-            position: vec3(0., 0., 500.),
-            rotation: Quat::from_axis_angle(Vec3::X, PI * -0.25),
-            scale: Vec3::ONE,
+            transform: entity::Transform {
+                position: vec3(0., 0., 500.),
+                rotation: Quat::from_axis_angle(Vec3::X, PI * -0.25),
+                scale: Vec3::ONE,
+            },
             max_count: 10000,
             lifetime: 0,
             min_speed: 0.1,
@@ -149,11 +156,11 @@ fn main() -> Result<()> {
                     if !cursor_locked {
                         return;
                     };
-                    let mut rotation = scene.camera.rotation.to_euler(EulerRot::YXZ);
+                    let mut rotation = scene.camera.transform.rotation.to_euler(EulerRot::YXZ);
                     rotation.0 += x as f32 * 0.001;
                     rotation.1 = (rotation.1 + y as f32 * 0.001).clamp(PI * -0.5, PI * 0.5);
                     debug!("rotation: {:?}", rotation);
-                    scene.camera.rotation =
+                    scene.camera.transform.rotation =
                         Quat::from_euler(glam::EulerRot::YXZ, rotation.0, rotation.1, rotation.2);
                 }
                 DeviceEvent::MouseWheel {
@@ -171,8 +178,9 @@ fn main() -> Result<()> {
                 window.request_redraw();
             }
             Event::RedrawRequested(..) => {
-                scene.cube.rotation *= Quat::from_axis_angle(Vec3::Y, PI * 0.01);
-                scene.particle_system.rotation *= Quat::from_axis_angle(Vec3::Y, PI * 0.001);
+                scene.cube.transform.rotation *= Quat::from_axis_angle(Vec3::Y, PI * 0.01);
+                scene.particle_system.transform.rotation *=
+                    Quat::from_axis_angle(Vec3::Y, PI * 0.001);
 
                 cube_pipeline.update(&scene).block_on().unwrap();
                 particle_pipeline.update(&scene).block_on().unwrap();

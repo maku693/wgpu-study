@@ -25,12 +25,12 @@ impl Uniforms {
         };
 
         let view_matrix = {
-            let center = camera.position + camera.rotation * Vec3::Z;
+            let center = camera.transform.position + camera.transform.rotation * Vec3::Z;
             let up = Vec3::Y;
-            Mat4::look_at_lh(camera.position, center, up)
+            Mat4::look_at_lh(camera.transform.position, center, up)
         };
 
-        let model_matrix = Mat4::from_scale_rotation_translation(cube.scale, cube.rotation, cube.position);
+        let model_matrix = Mat4::from_scale_rotation_translation(cube.transform.scale, cube.transform.rotation, cube.transform.position);
 
         Self {
             mvp_matrix: proj_matrix * view_matrix * model_matrix,
