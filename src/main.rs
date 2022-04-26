@@ -45,8 +45,8 @@ fn main() -> Result<()> {
             scale: Vec3::ONE,
         },
         particle_system: entity::ParticleSystem {
-            position: Vec3::ZERO,
-            rotation: Quat::IDENTITY,
+            position: vec3(0., 0., 500.),
+            rotation: Quat::from_axis_angle(Vec3::X, PI * -0.25),
             scale: Vec3::ONE,
             max_count: 10000,
             lifetime: 0,
@@ -83,7 +83,7 @@ fn main() -> Result<()> {
         sleep(Duration::from_millis(1));
     });
 
-    let mut current_sample = 3;
+    let mut current_sample = 1;
     let mut cursor_locked = false;
 
     event_loop.run(move |e, _, control_flow| {
@@ -172,6 +172,7 @@ fn main() -> Result<()> {
             }
             Event::RedrawRequested(..) => {
                 scene.cube.rotation *= Quat::from_axis_angle(Vec3::Y, PI * 0.01);
+                scene.particle_system.rotation *= Quat::from_axis_angle(Vec3::Y, PI * 0.001);
 
                 cube_pipeline.update(&scene).block_on().unwrap();
                 particle_pipeline.update(&scene).block_on().unwrap();

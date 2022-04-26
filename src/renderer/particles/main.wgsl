@@ -32,7 +32,7 @@ fn vs_main(
 
     var out: VertexOut;
     out.position = uniforms.p_mat * position;
-    out.color = vec4<f32>(vec3<f32>(vertex_position + 0.5), 1.0);
+    out.color = vec4<f32>(instance.color, 1.0);
 
     return out;
 }
