@@ -12,9 +12,7 @@ use crate::{entity, renderer};
 #[derive(Debug, Copy, Clone, Default, Pod, Zeroable)]
 #[repr(C)]
 struct Uniforms {
-    mvp_matrix: Mat4,
-    m_mat: Mat4,
-    v_mat: Mat4,
+    mv_mat: Mat4,
     p_mat: Mat4,
 }
 
@@ -40,9 +38,7 @@ impl Uniforms {
         );
 
         Self {
-            mvp_matrix: p_mat * v_mat * m_mat,
-            m_mat,
-            v_mat,
+            mv_mat: v_mat * m_mat,
             p_mat,
         }
     }

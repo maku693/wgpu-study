@@ -13,9 +13,7 @@ use crate::{entity, renderer};
 #[derive(Debug, Copy, Clone, Default, Pod, Zeroable)]
 #[repr(C)]
 struct Uniforms {
-    mvp_matrix: Mat4,
-    m_mat: Mat4,
-    v_mat: Mat4,
+    mv_mat: Mat4,
     p_mat: Mat4,
     particle_size: f32,
     _pad0: [u8; 12],
@@ -47,9 +45,7 @@ impl Uniforms {
         );
 
         Self {
-            mvp_matrix: p_mat * v_mat * m_mat,
-            m_mat,
-            v_mat,
+            mv_mat: v_mat * m_mat,
             p_mat,
             particle_size: particle_system.particle_size,
             ..Default::default()
@@ -68,10 +64,6 @@ struct Instance {
 
 pub struct PipelineState {
     uniform_buffer: wgpu::Buffer,
-    _vertex_buffer: wgpu::Buffer,
-    _index_buffer: wgpu::Buffer,
-    _instance_buffer: wgpu::Buffer,
-
     render_bundle: wgpu::RenderBundle,
 }
 
@@ -122,9 +114,6 @@ impl PipelineState {
 
         Self {
             uniform_buffer,
-            _vertex_buffer: vertex_buffer,
-            _index_buffer: index_buffer,
-            _instance_buffer: instance_buffer,
             render_bundle,
         }
     }

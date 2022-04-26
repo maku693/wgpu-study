@@ -1,7 +1,5 @@
 struct Uniforms {
-    mvp_matrix: mat4x4<f32>;
-    m_mat: mat4x4<f32>;
-    v_mat: mat4x4<f32>;
+    mv_mat: mat4x4<f32>;
     p_mat: mat4x4<f32>;
 };
 
@@ -19,7 +17,7 @@ fn vs_main(
 ) -> VertexOut {
     let instance_position = vec3<f32>(0.0, 0.0, 0.0);
 
-    var position = uniforms.v_mat * uniforms.m_mat * vec4<f32>(instance_position, 1.0);
+    var position = uniforms.mv_mat * vec4<f32>(instance_position, 1.0);
     position += vec4<f32>(vertex_position, 1.0);
 
     var out: VertexOut;
