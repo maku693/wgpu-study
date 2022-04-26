@@ -14,6 +14,9 @@ use crate::{entity, renderer};
 #[repr(C)]
 struct Uniforms {
     mvp_matrix: Mat4,
+    m_mat: Mat4,
+    v_mat: Mat4,
+    p_mat: Mat4,
 }
 
 impl Uniforms {
@@ -24,25 +27,28 @@ impl Uniforms {
             ..
         } = scene;
 
-        let proj_matrix = {
+        let p_mat = {
             let fovy = camera.fov / camera.aspect_ratio / 180.;
             Mat4::perspective_lh(fovy, camera.aspect_ratio, camera.near, camera.far)
         };
 
-        let view_matrix = {
+        let v_mat = {
             let center = camera.position + camera.rotation * Vec3::Z;
             let up = Vec3::Y;
             Mat4::look_at_lh(camera.position, center, up)
         };
 
-        let model_matrix = Mat4::from_scale_rotation_translation(
+        let m_mat = Mat4::from_scale_rotation_translation(
             particle_system.scale,
             particle_system.rotation,
             particle_system.position,
         );
 
         Self {
-            mvp_matrix: proj_matrix * view_matrix * model_matrix,
+            mvp_matrix: p_mat * v_mat * m_mat,
+            m_mat,
+            v_mat,
+            p_mat,
         }
     }
 }
