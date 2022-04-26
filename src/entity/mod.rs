@@ -25,6 +25,7 @@ pub struct Cube {
 pub struct ParticleSystem {
     pub transform: Transform,
     pub max_count: u32,
+    pub particle_size: f32,
     pub lifetime: u32,
     pub min_speed: f32,
     pub max_speed: f32,

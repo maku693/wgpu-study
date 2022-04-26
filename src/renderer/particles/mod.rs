@@ -17,6 +17,8 @@ struct Uniforms {
     m_mat: Mat4,
     v_mat: Mat4,
     p_mat: Mat4,
+    particle_size: f32,
+    _pad0: [u8; 12],
 }
 
 impl Uniforms {
@@ -49,6 +51,8 @@ impl Uniforms {
             m_mat,
             v_mat,
             p_mat,
+            particle_size: particle_system.particle_size,
+            ..Default::default()
         }
     }
 }
@@ -142,6 +146,10 @@ impl PipelineState {
     }
 
     fn make_instance_buffer(device: &wgpu::Device, scene: &entity::Scene) -> wgpu::Buffer {
+        let entity::Scene {
+            particle_system, ..
+        } = scene;
+
         let unix_milli = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap()
@@ -149,13 +157,13 @@ impl PipelineState {
         info!("Seeded RNG with {}", unix_milli);
         let mut rng = Pcg64Mcg::seed_from_u64(unix_milli);
 
-        let instances: Vec<_> = (0..scene.particle_system.max_count)
+        let instances: Vec<_> = (0..particle_system.max_count)
             .map(|_| Instance {
                 position: vec3(
-                    rng.gen_range(-1.0..1.0),
-                    rng.gen_range(-1.0..1.0),
-                    rng.gen_range(-1.0..1.0),
-                ) * 100.0,
+                    rng.gen_range(-0.5..0.5),
+                    rng.gen_range(-0.5..0.5),
+                    rng.gen_range(-0.5..0.5),
+                ) * particle_system.transform.scale,
                 color: vec3(
                     rng.gen_range(0.0..1.0),
                     rng.gen_range(0.0..1.0),

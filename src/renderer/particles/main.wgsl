@@ -3,6 +3,7 @@ struct Uniforms {
     m_mat: mat4x4<f32>;
     v_mat: mat4x4<f32>;
     p_mat: mat4x4<f32>;
+    particle_size: f32;
 };
 
 struct Instance {
@@ -28,7 +29,7 @@ fn vs_main(
     let instance = instances[instance_index];
 
     var position = uniforms.v_mat * uniforms.m_mat * vec4<f32>(instance.position, 1.0);
-    position += vec4<f32>(vertex_position, 1.0);
+    position += vec4<f32>(vertex_position * uniforms.particle_size, 1.0);
 
     var out: VertexOut;
     out.position = uniforms.p_mat * position;

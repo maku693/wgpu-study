@@ -51,13 +51,14 @@ fn main() -> Result<()> {
         },
         particle_system: entity::ParticleSystem {
             transform: entity::Transform {
-                position: vec3(0., 0., 500.),
+                position: vec3(0., 0., 10.),
                 rotation: Quat::from_axis_angle(Vec3::X, PI * -0.25),
-                scale: Vec3::ONE,
+                scale: Vec3::ONE * 1.5,
             },
             max_count: 10000,
+            particle_size: 0.01,
             lifetime: 0,
-            min_speed: 0.1,
+            min_speed: 0.01,
             max_speed: 1.,
         },
     };
