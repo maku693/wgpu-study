@@ -112,9 +112,12 @@ fn main() -> Result<()> {
                 WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
                 WindowEvent::Resized(size) => {
                     renderer.resize(size);
+                    scene.camera.aspect_ratio = size.width as f32 / size.height as f32;
                 }
                 WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
                     renderer.resize(*new_inner_size);
+                    scene.camera.aspect_ratio =
+                        new_inner_size.width as f32 / new_inner_size.height as f32;
                 }
                 WindowEvent::MouseInput {
                     state: ElementState::Released,
