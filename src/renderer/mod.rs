@@ -9,7 +9,6 @@ pub struct Renderer {
     surface_format: wgpu::TextureFormat,
     device: wgpu::Device,
     queue: wgpu::Queue,
-    depth_texture: wgpu::Texture,
     depth_texture_view: wgpu::TextureView,
 }
 
@@ -47,24 +46,14 @@ impl Renderer {
             .context("There is no preferred format")?;
         Self::configure_surface(&surface, &device, surface_format, width, height);
 
-        let depth_texture = Self::create_depth_texture(&device, Self::DEPTH_FORMAT, width, height);
-        let depth_texture_view = depth_texture.create_view(&wgpu::TextureViewDescriptor {
-            label: Some("Depth texture view"),
-            format: Some(Self::DEPTH_FORMAT),
-            dimension: Some(wgpu::TextureViewDimension::D2),
-            aspect: wgpu::TextureAspect::DepthOnly,
-            base_mip_level: 0,
-            mip_level_count: None,
-            base_array_layer: 0,
-            array_layer_count: None,
-        });
+        let depth_texture_view =
+            Self::create_depth_texture_view(&device, Self::DEPTH_FORMAT, width, height);
 
         Ok(Self {
             surface,
             surface_format,
             device,
             queue,
-            depth_texture,
             depth_texture_view,
         })
     }
@@ -88,25 +77,36 @@ impl Renderer {
         );
     }
 
-    fn create_depth_texture(
+    fn create_depth_texture_view(
         device: &wgpu::Device,
         format: wgpu::TextureFormat,
         width: u32,
         height: u32,
-    ) -> wgpu::Texture {
-        device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("Depth texture"),
-            size: wgpu::Extent3d {
-                width,
-                height,
-                depth_or_array_layers: 1,
-            },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-        })
+    ) -> wgpu::TextureView {
+        device
+            .create_texture(&wgpu::TextureDescriptor {
+                label: Some("Depth texture"),
+                size: wgpu::Extent3d {
+                    width,
+                    height,
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format,
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+            })
+            .create_view(&wgpu::TextureViewDescriptor {
+                label: Some("Depth texture view"),
+                format: Some(Self::DEPTH_FORMAT),
+                dimension: Some(wgpu::TextureViewDimension::D2),
+                aspect: wgpu::TextureAspect::DepthOnly,
+                base_mip_level: 0,
+                mip_level_count: None,
+                base_array_layer: 0,
+                array_layer_count: None,
+            })
     }
 
     pub fn surface_format(&self) -> wgpu::TextureFormat {
@@ -165,12 +165,12 @@ impl Renderer {
             surface,
             device,
             surface_format,
-            depth_texture,
+            depth_texture_view,
             ..
         } = self;
+        *depth_texture_view =
+            Self::create_depth_texture_view(device, Self::DEPTH_FORMAT, size.width, size.height);
         Self::configure_surface(surface, device, *surface_format, size.width, size.height);
-        *depth_texture =
-            Self::create_depth_texture(device, Self::DEPTH_FORMAT, size.width, size.height);
     }
 }
 
