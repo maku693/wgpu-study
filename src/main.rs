@@ -1,8 +1,6 @@
 use std::{
     f32::consts::PI,
     sync::{Arc, Mutex},
-    thread::sleep,
-    time::Duration,
 };
 
 use anyhow::{Context, Ok, Result};
@@ -105,8 +103,6 @@ async fn main() -> Result<()> {
             },
             event_loop::ControlFlow,
         };
-
-        *control_flow = ControlFlow::Poll;
 
         debug!("{:#?}", e);
 
