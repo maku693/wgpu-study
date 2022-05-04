@@ -91,7 +91,7 @@ async fn main() -> Result<()> {
         &scene,
     ));
 
-    let mut current_sample = 1;
+    let current_sample = Arc::new(std::sync::atomic::AtomicI32::new(1));
     let mut cursor_locked = false;
 
     let semaphore = Arc::new(tokio::sync::Semaphore::new(1));
@@ -146,13 +146,13 @@ async fn main() -> Result<()> {
                         cursor_locked = false;
                     }
                     Some(VirtualKeyCode::Key1) => {
-                        current_sample = 1;
+                        current_sample.store(1, std::sync::atomic::Ordering::SeqCst);
                     }
                     Some(VirtualKeyCode::Key2) => {
-                        current_sample = 2;
+                        current_sample.store(2, std::sync::atomic::Ordering::SeqCst);
                     }
                     Some(VirtualKeyCode::Key3) => {
-                        current_sample = 3;
+                        current_sample.store(3, std::sync::atomic::Ordering::SeqCst);
                     }
                     _ => (),
                 },
@@ -194,6 +194,7 @@ async fn main() -> Result<()> {
                     Quat::from_axis_angle(Vec3::Y, PI * 0.001);
 
                 {
+                    let current_sample = current_sample.clone();
                     let cube_pipeline = cube_pipeline.clone();
                     let particle_pipeline = particle_pipeline.clone();
                     let billboard_pipeline = billboard_pipeline.clone();
@@ -201,13 +202,14 @@ async fn main() -> Result<()> {
                     let semaphore = semaphore.clone();
 
                     tokio::task::spawn(async move {
-                        let _permit = semaphore.acquire();
+                        let _permit = semaphore.acquire().await?;
+
                         cube_pipeline.update(&scene).await?;
                         particle_pipeline.update(&scene).await?;
                         billboard_pipeline.update(&scene).await?;
 
                         let renderer = renderer.lock().unwrap();
-                        match current_sample {
+                        match current_sample.load(std::sync::atomic::Ordering::SeqCst) {
                             1 => renderer.render(particle_pipeline.as_ref()),
                             2 => renderer.render(cube_pipeline.as_ref()),
                             3 => renderer.render(billboard_pipeline.as_ref()),
