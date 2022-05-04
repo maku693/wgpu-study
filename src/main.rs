@@ -1,19 +1,24 @@
-use std::{f32::consts::PI, thread::sleep, time::Duration};
+use std::{
+    f32::consts::PI,
+    sync::{Arc, Mutex},
+    thread::sleep,
+    time::Duration,
+};
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Ok, Result};
 use glam::{vec3, EulerRot, Quat, Vec3};
 use log::{debug, info};
-use pollster::FutureExt;
 
 mod entity;
 mod renderer;
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
     env_logger::init();
 
     let event_loop = winit::event_loop::EventLoop::new();
 
-    let instance = wgpu::Instance::new(wgpu::Backends::PRIMARY);
+    let instance = Arc::new(wgpu::Instance::new(wgpu::Backends::PRIMARY));
 
     let window = winit::window::WindowBuilder::new()
         .with_title("antimodern")
@@ -24,7 +29,7 @@ fn main() -> Result<()> {
         .build(&event_loop)
         .context("Failed to build window")?;
 
-    let mut renderer = renderer::Renderer::new(&instance, &window).block_on()?;
+    let renderer = renderer::Renderer::new(&instance, &window).await?;
 
     let mut scene = entity::Scene {
         camera: {
@@ -65,34 +70,32 @@ fn main() -> Result<()> {
 
     info!("{:#?}", &scene);
 
-    let cube_pipeline = renderer::cube::PipelineState::new(
+    let cube_pipeline = Arc::new(renderer::cube::PipelineState::new(
         renderer.device(),
         renderer.surface_format(),
         renderer.depth_texture_format(),
         &scene,
-    );
+    ));
 
-    let particle_pipeline = renderer::particles::PipelineState::new(
+    let particle_pipeline = Arc::new(renderer::particles::PipelineState::new(
         renderer.device(),
         renderer.surface_format(),
         renderer.depth_texture_format(),
         &scene,
-    );
+    ));
 
-    let billboard_pipeline = renderer::billboard::PipelineState::new(
+    let billboard_pipeline = Arc::new(renderer::billboard::PipelineState::new(
         renderer.device(),
         renderer.surface_format(),
         renderer.depth_texture_format(),
         &scene,
-    );
-
-    std::thread::spawn(move || loop {
-        instance.poll_all(true);
-        sleep(Duration::from_millis(1));
-    });
+    ));
 
     let mut current_sample = 1;
     let mut cursor_locked = false;
+
+    let semaphore = Arc::new(tokio::sync::Semaphore::new(1));
+    let renderer = Arc::new(Mutex::new(renderer));
 
     event_loop.run(move |e, _, control_flow| {
         use winit::{
@@ -111,11 +114,11 @@ fn main() -> Result<()> {
             Event::WindowEvent { event, .. } => match event {
                 WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
                 WindowEvent::Resized(size) => {
-                    renderer.resize(size);
+                    renderer.lock().unwrap().resize(size);
                     scene.camera.aspect_ratio = size.width as f32 / size.height as f32;
                 }
                 WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
-                    renderer.resize(*new_inner_size);
+                    renderer.lock().unwrap().resize(*new_inner_size);
                     scene.camera.aspect_ratio =
                         new_inner_size.width as f32 / new_inner_size.height as f32;
                 }
@@ -179,6 +182,10 @@ fn main() -> Result<()> {
                 _ => (),
             },
             Event::MainEventsCleared => {
+                let instance = instance.clone();
+                tokio::spawn(async move {
+                    instance.poll_all(false);
+                });
                 window.request_redraw();
             }
             Event::RedrawRequested(..) => {
@@ -186,16 +193,30 @@ fn main() -> Result<()> {
                 scene.particle_system.transform.rotation *=
                     Quat::from_axis_angle(Vec3::Y, PI * 0.001);
 
-                cube_pipeline.update(&scene).block_on().unwrap();
-                particle_pipeline.update(&scene).block_on().unwrap();
-                billboard_pipeline.update(&scene).block_on().unwrap();
+                {
+                    let cube_pipeline = cube_pipeline.clone();
+                    let particle_pipeline = particle_pipeline.clone();
+                    let billboard_pipeline = billboard_pipeline.clone();
+                    let renderer = renderer.clone();
+                    let semaphore = semaphore.clone();
 
-                match current_sample {
-                    1 => renderer.render(&particle_pipeline),
-                    2 => renderer.render(&cube_pipeline),
-                    3 => renderer.render(&billboard_pipeline),
-                    _ => (),
-                };
+                    tokio::task::spawn(async move {
+                        let _permit = semaphore.acquire();
+                        cube_pipeline.update(&scene).await?;
+                        particle_pipeline.update(&scene).await?;
+                        billboard_pipeline.update(&scene).await?;
+
+                        let renderer = renderer.lock().unwrap();
+                        match current_sample {
+                            1 => renderer.render(particle_pipeline.as_ref()),
+                            2 => renderer.render(cube_pipeline.as_ref()),
+                            3 => renderer.render(billboard_pipeline.as_ref()),
+                            _ => (),
+                        };
+
+                        Ok(())
+                    });
+                }
             }
             _ => (),
         }
