@@ -4,6 +4,7 @@ use anyhow::Result;
 use bytemuck::{bytes_of, cast_slice, Pod, Zeroable};
 use glam::{const_vec3, vec3, Mat4, Vec3};
 use log::{debug, info};
+use pollster::FutureExt;
 use rand::prelude::*;
 use rand_pcg::Pcg64Mcg;
 use wgpu::util::DeviceExt;
@@ -325,12 +326,12 @@ impl PipelineState {
         encoder.finish(&wgpu::RenderBundleDescriptor { label: None })
     }
 
-    pub async fn update(&self, scene: &entity::Scene) -> Result<()> {
+    pub fn update(&self, device: &wgpu::Device, scene: &entity::Scene) -> Result<()> {
         let uniforms = Uniforms::new(scene);
         debug!("{:#?}", uniforms);
 
         let uniform_buffer_slice = self.uniform_buffer.slice(..);
-        uniform_buffer_slice.map_async(wgpu::MapMode::Write).await?;
+        uniform_buffer_slice.map_blocking(device, wgpu::MapMode::Write)?;
         uniform_buffer_slice
             .get_mapped_range_mut()
             .copy_from_slice(bytes_of(&uniforms));
@@ -343,5 +344,18 @@ impl PipelineState {
 impl renderer::Pipeline for PipelineState {
     fn render<'a>(&'a self, render_pass: &mut wgpu::RenderPass<'a>) {
         render_pass.execute_bundles(Some(&self.render_bundle));
+    }
+}
+
+trait BufferSliceExt {
+    fn map_blocking(&self, device: &wgpu::Device, mode: wgpu::MapMode) -> Result<()>;
+}
+
+impl<'a> BufferSliceExt for wgpu::BufferSlice<'a> {
+    fn map_blocking(&self, device: &wgpu::Device, mode: wgpu::MapMode) -> Result<()> {
+        let fut = self.map_async(mode);
+        device.poll(wgpu::Maintain::Wait);
+        fut.block_on()?;
+        Ok(())
     }
 }

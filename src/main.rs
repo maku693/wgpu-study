@@ -86,10 +86,10 @@ fn main() -> Result<()> {
         &scene,
     );
 
-    std::thread::spawn(move || loop {
-        instance.poll_all(true);
-        sleep(Duration::from_millis(1));
-    });
+    // std::thread::spawn(move || loop {
+    //     instance.poll_all(true);
+    //     sleep(Duration::from_millis(1));
+    // });
 
     let mut current_sample = 1;
     let mut cursor_locked = false;
@@ -186,9 +186,9 @@ fn main() -> Result<()> {
                 scene.particle_system.transform.rotation *=
                     Quat::from_axis_angle(Vec3::Y, PI * 0.001);
 
-                cube_pipeline.update(&scene).block_on().unwrap();
-                particle_pipeline.update(&scene).block_on().unwrap();
-                billboard_pipeline.update(&scene).block_on().unwrap();
+                // cube_pipeline.update(&scene).block_on().unwrap();
+                particle_pipeline.update(renderer.device(), &scene).unwrap();
+                // billboard_pipeline.update(&scene).block_on().unwrap();
 
                 match current_sample {
                     1 => renderer.render(&particle_pipeline),
