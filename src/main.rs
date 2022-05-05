@@ -433,19 +433,19 @@ fn main() -> Result<()> {
                 }
                 _ => (),
             },
-            Event::MainEventsCleared => while executer.try_tick() {},
-            Event::RedrawEventsCleared => {
+            Event::MainEventsCleared => {
+                while executer.try_tick() {}
+
                 let target_frame_interval = Duration::from_secs_f64(1.0 / 60.0);
                 let elapsed_from_last_draw = last_drawn_at.elapsed();
                 if target_frame_interval > elapsed_from_last_draw {
                     let wait = target_frame_interval - elapsed_from_last_draw;
                     *control_flow = ControlFlow::WaitUntil(Instant::now() + wait);
-                } else {
-                    window.request_redraw();
-                    last_drawn_at = Instant::now();
+                    return;
                 }
-            }
-            Event::RedrawRequested(..) => {
+
+                last_drawn_at = Instant::now();
+
                 scene.particle_system.transform.rotation *=
                     Quat::from_axis_angle(Vec3::Y, PI * 0.01);
 
