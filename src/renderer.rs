@@ -210,7 +210,7 @@ impl Renderer {
                 },
             ],
         });
-        let shader_module = device.create_shader_module(&wgpu::include_wgsl!("main.wgsl"));
+        let shader_module = device.create_shader_module(&wgpu::include_wgsl!("particle.wgsl"));
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: None,
