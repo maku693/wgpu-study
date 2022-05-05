@@ -131,7 +131,7 @@ fn main() -> Result<()> {
         .build(&event_loop)?;
 
     let mut cursor_locked = false;
-    let mut last_drawn_at = Instant::now();
+    let mut last_render_inst = Instant::now();
 
     let mut scene = Scene {
         camera: {
@@ -441,14 +441,14 @@ fn main() -> Result<()> {
                 while executer.try_tick() {}
 
                 let target_frame_interval = Duration::from_secs_f64(1.0 / 60.0);
-                let elapsed_from_last_draw = last_drawn_at.elapsed();
+                let elapsed_from_last_draw = last_render_inst.elapsed();
                 if target_frame_interval > elapsed_from_last_draw {
                     let wait = target_frame_interval - elapsed_from_last_draw;
                     *control_flow = ControlFlow::WaitUntil(Instant::now() + wait);
                     return;
                 }
 
-                last_drawn_at = Instant::now();
+                last_render_inst = Instant::now();
 
                 scene.particle_system.transform.rotation *=
                     Quat::from_axis_angle(Vec3::Y, PI * 0.01);
