@@ -131,7 +131,6 @@ fn main() -> Result<()> {
 
     let mut cursor_locked = false;
     let mut last_drawn_at = Instant::now();
-    let mut current_buffer_index = 0;
 
     let mut scene = Scene {
         camera: {
@@ -192,17 +191,7 @@ fn main() -> Result<()> {
 
     let mut depth_texture_view = create_depth_texture_view(&device, DEPTH_FORMAT, width, height);
 
-    let staging_buffers = (0..3)
-        .into_iter()
-        .map(|i: i8| {
-            device.create_buffer(&wgpu::BufferDescriptor {
-                label: Some(format!("Staging buffer #{}", i.to_string()).as_str()),
-                size: size_of::<Uniforms>() as _,
-                usage: wgpu::BufferUsages::MAP_WRITE | wgpu::BufferUsages::COPY_SRC,
-                mapped_at_creation: true,
-            })
-        })
-        .collect::<Vec<_>>();
+    let mut staging_belt = wgpu::util::StagingBelt::new(64);
 
     let uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
         label: Some("Uniform buffer"),
@@ -454,7 +443,6 @@ fn main() -> Result<()> {
                 } else {
                     window.request_redraw();
                     last_drawn_at = Instant::now();
-                    current_buffer_index = (current_buffer_index + 1) % staging_buffers.len()
                 }
             }
             Event::RedrawRequested(..) => {
@@ -471,19 +459,16 @@ fn main() -> Result<()> {
 
                 let mut encoder = device.create_command_encoder(&Default::default());
 
-                let staging_buffer = &staging_buffers[current_buffer_index];
-                encoder.copy_buffer_to_buffer(
-                    &staging_buffer,
-                    0,
-                    &uniform_buffer,
-                    0,
-                    size_of::<Uniforms>() as _,
-                );
-                staging_buffer
-                    .slice(..)
-                    .get_mapped_range_mut()
+                staging_belt
+                    .write_buffer(
+                        &mut encoder,
+                        &uniform_buffer,
+                        0,
+                        wgpu::BufferSize::new(size_of::<Uniforms>() as _).unwrap(),
+                        &device,
+                    )
                     .copy_from_slice(bytes_of(&uniforms));
-                staging_buffer.unmap();
+                staging_belt.finish();
 
                 {
                     let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -513,9 +498,8 @@ fn main() -> Result<()> {
 
                 frame_buffer.present();
 
-                executer
-                    .spawn(staging_buffer.slice(..).map_async(wgpu::MapMode::Write))
-                    .detach();
+                let fut = staging_belt.recall();
+                executer.spawn(fut).detach();
             }
             _ => (),
         }
