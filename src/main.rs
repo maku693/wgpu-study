@@ -13,6 +13,7 @@ use rand_pcg::Pcg64Mcg;
 use smol::{block_on, LocalExecutor};
 use wgpu::util::DeviceExt;
 use winit::{
+    dpi::PhysicalPosition,
     event::{
         DeviceEvent, ElementState, Event, KeyboardInput, MouseButton, MouseScrollDelta,
         VirtualKeyCode, WindowEvent,
@@ -422,13 +423,16 @@ fn main() -> Result<()> {
                     scene.camera.transform.rotation =
                         Quat::from_euler(glam::EulerRot::YXZ, rotation.0, rotation.1, rotation.2);
                 }
-                DeviceEvent::MouseWheel {
-                    delta: MouseScrollDelta::PixelDelta(delta),
-                } => {
+                DeviceEvent::MouseWheel { delta } => {
                     if !cursor_locked {
                         return;
                     };
-                    scene.camera.fov = (scene.camera.fov + delta.y as f32 * -0.1).clamp(30., 120.);
+                    let y = match delta {
+                        MouseScrollDelta::PixelDelta(PhysicalPosition { y, .. }) => y as f32,
+                        MouseScrollDelta::LineDelta(_, y) => y * 60.0,
+                    };
+
+                    scene.camera.fov = (scene.camera.fov + y * -0.1).clamp(30., 120.);
                     debug!("fov: {:?}", scene.camera.fov);
                 }
                 _ => (),
