@@ -66,6 +66,7 @@ impl App {
     }
 
     pub fn resize(&mut self, size: winit::dpi::PhysicalSize<u32>) {
+        self.scene.camera.aspect_ratio = size.width as f32 / size.height as f32;
         self.renderer.recreate_render_attachments(size);
     }
 
