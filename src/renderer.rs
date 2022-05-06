@@ -150,10 +150,10 @@ impl Renderer {
             let instances: Vec<_> = (0..scene.particle_system.max_count)
                 .map(|_| Instance {
                     position: vec3(
-                        rng.gen_range(-0.5..0.5),
-                        rng.gen_range(-0.5..0.5),
-                        rng.gen_range(-0.5..0.5),
-                    ) * scene.particle_system.transform.scale,
+                        rng.gen_range(0.0..1.0),
+                        rng.gen_range(0.0..1.0),
+                        rng.gen_range(0.0..1.0),
+                    ) - 0.5,
                     color: vec3(
                         rng.gen_range(0.0..1.0),
                         rng.gen_range(0.0..1.0),

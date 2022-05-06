@@ -1,6 +1,7 @@
 use std::{f32::consts::PI, future::Future};
 
 use anyhow::{Ok, Result};
+use chrono::prelude::*;
 use glam::{vec3, EulerRot, Quat, Vec3};
 use log::{debug, info};
 use winit::{
@@ -45,7 +46,7 @@ impl App {
                     rotation: Quat::from_axis_angle(Vec3::X, PI * -0.25),
                     scale: Vec3::ONE * 1.5,
                 },
-                max_count: 10000,
+                max_count: 1000,
                 particle_size: 0.01,
                 lifetime: 0,
                 min_speed: 0.01,
@@ -112,7 +113,14 @@ impl App {
     }
 
     pub fn render(&mut self) -> impl Future<Output = ()> {
-        self.scene.particle_system.transform.rotation *= Quat::from_axis_angle(Vec3::Y, PI * 0.01);
+        let now = Local::now().timestamp_millis() as f64 * 0.001;
+
+        self.scene.particle_system.transform.rotation *= Quat::from_axis_angle(Vec3::Y, PI * 0.001);
+
+        let scale = ((std::f64::consts::TAU * now * 0.01).cos() + 1.0) * 0.5;
+        let scale = scale * 8.0 + 2.0;
+        self.scene.particle_system.transform.scale = Vec3::ONE * scale as f32;
+
         self.renderer.render(&self.scene)
     }
 }

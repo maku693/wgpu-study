@@ -9,6 +9,7 @@ edition = "2021"
 
 anyhow = "1"
 bytemuck = { version = "1", features = ["derive"] }
+chrono = "0.4"
 env_logger = "0.9"
 glam = { version = "0.20", features = ["bytemuck"] }
 log = "0.4"
