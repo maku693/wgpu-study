@@ -401,7 +401,7 @@ impl Renderer {
 
             encoder.set_bind_group(0, &bind_group, &[]);
             encoder.set_pipeline(&render_pipeline);
-            encoder.draw(0..3, 0..0);
+            encoder.draw(0..3, 0..1);
             encoder.finish(&wgpu::RenderBundleDescriptor {
                 label: Some("Composite render bundle"),
             })
@@ -482,7 +482,6 @@ impl Renderer {
                     stencil_ops: None,
                 }),
             });
-
             render_pass.execute_bundles(Some(&self.render_bundle));
         }
 
