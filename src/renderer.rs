@@ -138,6 +138,34 @@ impl Renderer {
             usage: wgpu::BufferUsages::INDEX,
         });
 
+        let offscreen_color = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("Offscreen Color"),
+            size: wgpu::Extent3d {
+                width,
+                height,
+                ..Default::default()
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba32Float,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+        });
+
+        let offscreen_half = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("Offscreen Color"),
+            size: wgpu::Extent3d {
+                width: width / 2,
+                height: height / 2,
+                ..Default::default()
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba32Float,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+        });
+
         let instance_buffer = {
             let rand_seed = SystemTime::now()
                 .duration_since(SystemTime::UNIX_EPOCH)
