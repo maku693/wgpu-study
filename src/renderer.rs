@@ -74,15 +74,24 @@ struct Instance {
     _pad1: [u8; 4],
 }
 
+#[derive(Debug, Copy, Clone, Default, Pod, Zeroable)]
+#[repr(C)]
+struct CompositeUniforms {
+    exposure: f32,
+}
+
 pub struct Renderer {
     surface: wgpu::Surface,
     device: wgpu::Device,
     queue: wgpu::Queue,
     surface_format: wgpu::TextureFormat,
+    offscreen_color_texture_view: wgpu::TextureView,
     depth_texture_view: wgpu::TextureView,
     staging_belt: wgpu::util::StagingBelt,
     uniform_buffer: wgpu::Buffer,
     render_bundle: wgpu::RenderBundle,
+    composite_uniform_buffer: wgpu::Buffer,
+    composite_render_bundle: wgpu::RenderBundle,
 }
 
 impl Renderer {
@@ -117,6 +126,8 @@ impl Renderer {
         let PhysicalSize { width, height } = window.inner_size();
 
         configure_surface(&device, &surface, surface_format, width, height);
+        let offscreen_color_texture_view =
+            create_offscreen_color_texture_view(&device, width, height);
         let depth_texture_view = create_depth_texture_view(&device, width, height);
 
         let staging_belt = wgpu::util::StagingBelt::new(64);
@@ -211,6 +222,7 @@ impl Renderer {
                 },
             ],
         });
+
         let shader_module = device.create_shader_module(&wgpu::include_wgsl!("particle.wgsl"));
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -291,6 +303,110 @@ impl Renderer {
             label: Some("Particle render bundle"),
         });
 
+        let composite_uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Composite pass uniform buffer"),
+            size: size_of::<Uniforms>() as _,
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+
+        let composite_render_bundle = {
+            let bind_group_layout =
+                device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                    label: None,
+                    entries: &[
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 0,
+                            visibility: wgpu::ShaderStages::FRAGMENT,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Uniform,
+                                has_dynamic_offset: false,
+                                min_binding_size: wgpu::BufferSize::new(
+                                    size_of::<CompositeUniforms>() as _,
+                                ),
+                            },
+                            count: None,
+                        },
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 1,
+                            visibility: wgpu::ShaderStages::FRAGMENT,
+                            ty: wgpu::BindingType::Texture {
+                                sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                                view_dimension: wgpu::TextureViewDimension::D2,
+                                multisampled: false,
+                            },
+                            count: None,
+                        },
+                    ],
+                });
+
+            let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: None,
+                layout: &bind_group_layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: composite_uniform_buffer.as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: wgpu::BindingResource::TextureView(&offscreen_color_texture_view),
+                    },
+                ],
+            });
+
+            let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: None,
+                bind_group_layouts: &[&bind_group_layout],
+                push_constant_ranges: &[],
+            });
+
+            let shader_module = device.create_shader_module(&wgpu::include_wgsl!("composite.wgsl"));
+
+            let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: None,
+                layout: Some(&pipeline_layout),
+                vertex: wgpu::VertexState {
+                    module: &shader_module,
+                    entry_point: "vs_main",
+                    buffers: &[],
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: &shader_module,
+                    entry_point: "fs_main",
+                    targets: &[surface_format.into()],
+                }),
+                primitive: wgpu::PrimitiveState {
+                    topology: wgpu::PrimitiveTopology::TriangleList,
+                    strip_index_format: None,
+                    front_face: wgpu::FrontFace::Ccw,
+                    cull_mode: Some(wgpu::Face::Back),
+                    unclipped_depth: false,
+                    polygon_mode: wgpu::PolygonMode::Fill,
+                    conservative: false,
+                },
+                depth_stencil: None,
+                multisample: wgpu::MultisampleState::default(),
+                multiview: None,
+            });
+
+            let mut encoder =
+                device.create_render_bundle_encoder(&wgpu::RenderBundleEncoderDescriptor {
+                    label: None,
+                    color_formats: &[surface_format],
+                    depth_stencil: None,
+                    sample_count: 1,
+                    multiview: None,
+                });
+
+            encoder.set_bind_group(0, &bind_group, &[]);
+            encoder.set_pipeline(&render_pipeline);
+            encoder.draw(0..3, 0..0);
+            encoder.finish(&wgpu::RenderBundleDescriptor {
+                label: Some("Composite render bundle"),
+            })
+        };
+
         Ok(Self {
             surface,
             device,
@@ -298,8 +414,11 @@ impl Renderer {
             surface_format,
             staging_belt,
             uniform_buffer,
+            offscreen_color_texture_view,
             depth_texture_view,
             render_bundle,
+            composite_uniform_buffer,
+            composite_render_bundle,
         })
     }
 
@@ -315,6 +434,8 @@ impl Renderer {
             height,
         );
 
+        self.offscreen_color_texture_view =
+            create_offscreen_color_texture_view(&self.device, width, height);
         self.depth_texture_view = create_depth_texture_view(&self.device, width, height)
     }
 
@@ -329,42 +450,6 @@ impl Renderer {
         let frame_buffer_view = frame_buffer.texture.create_view(&Default::default());
 
         let mut encoder = self.device.create_command_encoder(&Default::default());
-
-        let offscreen_color = self.device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("Offscreen Color"),
-            size: wgpu::Extent3d {
-                width: 256,
-                height: 256,
-                ..Default::default()
-            },
-            mip_level_count: 2,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba32Float,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT
-                | wgpu::TextureUsages::COPY_SRC
-                | wgpu::TextureUsages::COPY_DST,
-        });
-
-        encoder.copy_texture_to_texture(
-            wgpu::ImageCopyTexture {
-                texture: &offscreen_color,
-                mip_level: 0,
-                origin: wgpu::Origin3d { x: 0, y: 0, z: 0 },
-                aspect: wgpu::TextureAspect::All,
-            },
-            wgpu::ImageCopyTexture {
-                texture: &offscreen_color,
-                mip_level: 1,
-                origin: wgpu::Origin3d { x: 0, y: 0, z: 0 },
-                aspect: wgpu::TextureAspect::All,
-            },
-            wgpu::Extent3d {
-                width: 128,
-                height: 128,
-                depth_or_array_layers: 1,
-            },
-        );
 
         self.staging_belt
             .write_buffer(
@@ -381,7 +466,7 @@ impl Renderer {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: None,
                 color_attachments: &[wgpu::RenderPassColorAttachment {
-                    view: &frame_buffer_view,
+                    view: &self.offscreen_color_texture_view,
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
@@ -399,6 +484,22 @@ impl Renderer {
             });
 
             render_pass.execute_bundles(Some(&self.render_bundle));
+        }
+
+        {
+            let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: None,
+                color_attachments: &[wgpu::RenderPassColorAttachment {
+                    view: &frame_buffer_view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                        store: true,
+                    },
+                }],
+                depth_stencil_attachment: None,
+            });
+            rpass.execute_bundles(Some(&self.composite_render_bundle));
         }
 
         self.queue.submit(Some(encoder.finish()));
@@ -428,19 +529,32 @@ fn configure_surface(
     );
 }
 
-fn create_offscreen_color_texture(device: &wgpu::Device, width: u32, height: u32) -> wgpu::Texture {
-    device.create_texture(&wgpu::TextureDescriptor {
+fn create_offscreen_color_texture_view(
+    device: &wgpu::Device,
+    width: u32,
+    height: u32,
+) -> wgpu::TextureView {
+    let texture = device.create_texture(&wgpu::TextureDescriptor {
         label: Some("Offscreen color texture"),
         size: wgpu::Extent3d {
             width,
             height,
             depth_or_array_layers: 1,
         },
-        mip_level_count: 4,
+        mip_level_count: 1,
         sample_count: 1,
         dimension: wgpu::TextureDimension::D2,
         format: COLOR_FORMAT,
-        usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+    });
+
+    device.create_sampler(&wgpu::SamplerDescriptor {
+        label: Some("Offscreen color texture sampler"),
+        ..Default::default()
+    });
+
+    texture.create_view(&wgpu::TextureViewDescriptor {
+        ..Default::default()
     })
 }
 
