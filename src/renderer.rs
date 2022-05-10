@@ -11,6 +11,7 @@ use winit::{dpi::PhysicalSize, window::Window};
 
 use crate::entity::Scene;
 
+const COLOR_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba32Float;
 const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
 
 const QUAD_VERTICES: [Vec3; 4] = [
@@ -138,34 +139,6 @@ impl Renderer {
             usage: wgpu::BufferUsages::INDEX,
         });
 
-        let offscreen_color = device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("Offscreen Color"),
-            size: wgpu::Extent3d {
-                width,
-                height,
-                ..Default::default()
-            },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba32Float,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
-        });
-
-        let offscreen_half = device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("Offscreen Color"),
-            size: wgpu::Extent3d {
-                width: width / 2,
-                height: height / 2,
-                ..Default::default()
-            },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba32Float,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
-        });
-
         let instance_buffer = {
             let rand_seed = SystemTime::now()
                 .duration_since(SystemTime::UNIX_EPOCH)
@@ -265,7 +238,7 @@ impl Renderer {
             fragment: Some(wgpu::FragmentState {
                 module: &shader_module,
                 entry_point: "fs_main",
-                targets: &[surface_format.into()],
+                targets: &[COLOR_FORMAT.into()],
             }),
             primitive: wgpu::PrimitiveState {
                 topology: wgpu::PrimitiveTopology::TriangleList,
@@ -294,7 +267,7 @@ impl Renderer {
         let mut encoder =
             device.create_render_bundle_encoder(&wgpu::RenderBundleEncoderDescriptor {
                 label: None,
-                color_formats: &[surface_format],
+                color_formats: &[COLOR_FORMAT],
                 depth_stencil: Some(wgpu::RenderBundleDepthStencil {
                     format: DEPTH_FORMAT,
                     depth_read_only: false,
@@ -357,6 +330,42 @@ impl Renderer {
 
         let mut encoder = self.device.create_command_encoder(&Default::default());
 
+        let offscreen_color = self.device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("Offscreen Color"),
+            size: wgpu::Extent3d {
+                width: 256,
+                height: 256,
+                ..Default::default()
+            },
+            mip_level_count: 2,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba32Float,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT
+                | wgpu::TextureUsages::COPY_SRC
+                | wgpu::TextureUsages::COPY_DST,
+        });
+
+        encoder.copy_texture_to_texture(
+            wgpu::ImageCopyTexture {
+                texture: &offscreen_color,
+                mip_level: 0,
+                origin: wgpu::Origin3d { x: 0, y: 0, z: 0 },
+                aspect: wgpu::TextureAspect::All,
+            },
+            wgpu::ImageCopyTexture {
+                texture: &offscreen_color,
+                mip_level: 1,
+                origin: wgpu::Origin3d { x: 0, y: 0, z: 0 },
+                aspect: wgpu::TextureAspect::All,
+            },
+            wgpu::Extent3d {
+                width: 128,
+                height: 128,
+                depth_or_array_layers: 1,
+            },
+        );
+
         self.staging_belt
             .write_buffer(
                 &mut encoder,
@@ -417,6 +426,22 @@ fn configure_surface(
             present_mode: wgpu::PresentMode::Fifo,
         },
     );
+}
+
+fn create_offscreen_color_texture(device: &wgpu::Device, width: u32, height: u32) -> wgpu::Texture {
+    device.create_texture(&wgpu::TextureDescriptor {
+        label: Some("Offscreen color texture"),
+        size: wgpu::Extent3d {
+            width,
+            height,
+            depth_or_array_layers: 1,
+        },
+        mip_level_count: 4,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: COLOR_FORMAT,
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+    })
 }
 
 fn create_depth_texture_view(device: &wgpu::Device, width: u32, height: u32) -> wgpu::TextureView {
