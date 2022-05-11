@@ -560,11 +560,6 @@ fn create_offscreen_color_texture_view(
         usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
     });
 
-    device.create_sampler(&wgpu::SamplerDescriptor {
-        label: Some("Offscreen color texture sampler"),
-        ..Default::default()
-    });
-
     texture.create_view(&wgpu::TextureViewDescriptor {
         ..Default::default()
     })
