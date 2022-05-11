@@ -91,7 +91,9 @@ pub struct Renderer {
     uniform_buffer: wgpu::Buffer,
     render_bundle: wgpu::RenderBundle,
     composite_uniform_buffer: wgpu::Buffer,
-    composite_render_bundle: wgpu::RenderBundle,
+    composite_bind_group_layout: wgpu::BindGroupLayout,
+    composite_bind_group: wgpu::BindGroup,
+    composite_render_pipeline: wgpu::RenderPipeline,
 }
 
 impl Renderer {
@@ -313,102 +315,84 @@ impl Renderer {
             mapped_at_creation: false,
         });
 
-        let composite_render_bundle = {
-            let bind_group_layout =
-                device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                    label: None,
-                    entries: &[
-                        wgpu::BindGroupLayoutEntry {
-                            binding: 0,
-                            visibility: wgpu::ShaderStages::FRAGMENT,
-                            ty: wgpu::BindingType::Buffer {
-                                ty: wgpu::BufferBindingType::Uniform,
-                                has_dynamic_offset: false,
-                                min_binding_size: wgpu::BufferSize::new(
-                                    size_of::<CompositeUniforms>() as _,
-                                ),
-                            },
-                            count: None,
-                        },
-                        wgpu::BindGroupLayoutEntry {
-                            binding: 1,
-                            visibility: wgpu::ShaderStages::FRAGMENT,
-                            ty: wgpu::BindingType::Texture {
-                                sample_type: wgpu::TextureSampleType::Float { filterable: false },
-                                view_dimension: wgpu::TextureViewDimension::D2,
-                                multisampled: false,
-                            },
-                            count: None,
-                        },
-                    ],
-                });
-
-            let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        let bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 label: None,
-                layout: &bind_group_layout,
                 entries: &[
-                    wgpu::BindGroupEntry {
+                    wgpu::BindGroupLayoutEntry {
                         binding: 0,
-                        resource: composite_uniform_buffer.as_entire_binding(),
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: wgpu::BufferSize::new(
+                                size_of::<CompositeUniforms>() as _
+                            ),
+                        },
+                        count: None,
                     },
-                    wgpu::BindGroupEntry {
+                    wgpu::BindGroupLayoutEntry {
                         binding: 1,
-                        resource: wgpu::BindingResource::TextureView(&offscreen_color_texture_view),
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            multisampled: false,
+                        },
+                        count: None,
                     },
                 ],
             });
 
-            let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: None,
-                bind_group_layouts: &[&bind_group_layout],
-                push_constant_ranges: &[],
-            });
-
-            let shader_module = device.create_shader_module(&wgpu::include_wgsl!("composite.wgsl"));
-
-            let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-                label: None,
-                layout: Some(&pipeline_layout),
-                vertex: wgpu::VertexState {
-                    module: &shader_module,
-                    entry_point: "vs_main",
-                    buffers: &[],
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: None,
+            layout: &bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: composite_uniform_buffer.as_entire_binding(),
                 },
-                fragment: Some(wgpu::FragmentState {
-                    module: &shader_module,
-                    entry_point: "fs_main",
-                    targets: &[surface_format.into()],
-                }),
-                primitive: wgpu::PrimitiveState {
-                    topology: wgpu::PrimitiveTopology::TriangleList,
-                    strip_index_format: None,
-                    front_face: wgpu::FrontFace::Ccw,
-                    cull_mode: Some(wgpu::Face::Back),
-                    unclipped_depth: false,
-                    polygon_mode: wgpu::PolygonMode::Fill,
-                    conservative: false,
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::TextureView(&offscreen_color_texture_view),
                 },
-                depth_stencil: None,
-                multisample: wgpu::MultisampleState::default(),
-                multiview: None,
-            });
+            ],
+        });
 
-            let mut encoder =
-                device.create_render_bundle_encoder(&wgpu::RenderBundleEncoderDescriptor {
-                    label: None,
-                    color_formats: &[surface_format],
-                    depth_stencil: None,
-                    sample_count: 1,
-                    multiview: None,
-                });
+        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: None,
+            bind_group_layouts: &[&bind_group_layout],
+            push_constant_ranges: &[],
+        });
 
-            encoder.set_bind_group(0, &bind_group, &[]);
-            encoder.set_pipeline(&render_pipeline);
-            encoder.draw(0..3, 0..1);
-            encoder.finish(&wgpu::RenderBundleDescriptor {
-                label: Some("Composite render bundle"),
-            })
-        };
+        let shader_module = device.create_shader_module(&wgpu::include_wgsl!("composite.wgsl"));
+
+        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: None,
+            layout: Some(&pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &shader_module,
+                entry_point: "vs_main",
+                buffers: &[],
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &shader_module,
+                entry_point: "fs_main",
+                targets: &[surface_format.into()],
+            }),
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::TriangleList,
+                strip_index_format: None,
+                front_face: wgpu::FrontFace::Ccw,
+                cull_mode: Some(wgpu::Face::Back),
+                unclipped_depth: false,
+                polygon_mode: wgpu::PolygonMode::Fill,
+                conservative: false,
+            },
+            depth_stencil: None,
+            multisample: wgpu::MultisampleState::default(),
+            multiview: None,
+        });
 
         Ok(Self {
             surface,
@@ -421,7 +405,9 @@ impl Renderer {
             depth_texture_view,
             render_bundle,
             composite_uniform_buffer,
-            composite_render_bundle,
+            composite_bind_group_layout: bind_group_layout,
+            composite_bind_group: bind_group,
+            composite_render_pipeline: render_pipeline,
         })
     }
 
@@ -439,7 +425,24 @@ impl Renderer {
 
         self.offscreen_color_texture_view =
             create_offscreen_color_texture_view(&self.device, width, height);
-        self.depth_texture_view = create_depth_texture_view(&self.device, width, height)
+        self.depth_texture_view = create_depth_texture_view(&self.device, width, height);
+
+        self.composite_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: None,
+            layout: &self.composite_bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: self.composite_uniform_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::TextureView(
+                        &self.offscreen_color_texture_view,
+                    ),
+                },
+            ],
+        });
     }
 
     pub fn render(&mut self, scene: &Scene) -> impl Future<Output = ()> {
@@ -511,7 +514,9 @@ impl Renderer {
                 }],
                 depth_stencil_attachment: None,
             });
-            rpass.execute_bundles(Some(&self.composite_render_bundle));
+            rpass.set_bind_group(0, &self.composite_bind_group, &[]);
+            rpass.set_pipeline(&self.composite_render_pipeline);
+            rpass.draw(0..3, 0..1);
         }
 
         self.queue.submit(Some(encoder.finish()));
