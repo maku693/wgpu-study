@@ -130,7 +130,9 @@ impl Renderer {
             create_offscreen_color_texture_view(&device, width, height);
         let depth_texture_view = create_depth_texture_view(&device, width, height);
 
-        let staging_belt = wgpu::util::StagingBelt::new(64);
+        let staging_belt = wgpu::util::StagingBelt::new(
+            (size_of::<Uniforms>() + size_of::<CompositeUniforms>()) as _,
+        );
 
         let uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Uniform buffer"),
@@ -171,7 +173,8 @@ impl Renderer {
                         rng.gen_range(0.0..1.0),
                         rng.gen_range(0.0..1.0),
                     )
-                    .normalize(),
+                    .normalize()
+                        * 2.0,
                     ..Default::default()
                 })
                 .collect();
@@ -441,6 +444,7 @@ impl Renderer {
 
     pub fn render(&mut self, scene: &Scene) -> impl Future<Output = ()> {
         let uniforms = Uniforms::new(&scene);
+        let composite_uniforms = CompositeUniforms { exposure: 1.0 };
 
         let frame_buffer = self
             .surface
@@ -460,6 +464,15 @@ impl Renderer {
                 &self.device,
             )
             .copy_from_slice(bytes_of(&uniforms));
+        self.staging_belt
+            .write_buffer(
+                &mut encoder,
+                &self.composite_uniform_buffer,
+                0,
+                wgpu::BufferSize::new(size_of::<CompositeUniforms>() as _).unwrap(),
+                &self.device,
+            )
+            .copy_from_slice(bytes_of(&composite_uniforms));
         self.staging_belt.finish();
 
         {

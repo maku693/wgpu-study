@@ -34,15 +34,13 @@ fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOut {
   );
 }
 
-
 @fragment
 fn fs_main(@location(0) tex_coord: vec2<f32>) -> @location(0) vec4<f32> {
-  var a_ = uniforms;
   let resolution = textureDimensions(offscreen_color);
   var color = textureLoad(
     offscreen_color,
     vec2<i32>(tex_coord * vec2<f32>(resolution)),
     0,
   );
-  return color;
+  return color * uniforms.exposure;
 }
