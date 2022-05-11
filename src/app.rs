@@ -66,6 +66,12 @@ impl App {
     }
 
     pub fn resize(&mut self, size: winit::dpi::PhysicalSize<u32>) {
+        // HACK: Ignore incorrect initial window resize event on windows
+        let current_inner_size = self.window.inner_size();
+        if size.width > current_inner_size.width || size.height > current_inner_size.height {
+            return;
+        }
+
         self.scene.camera.aspect_ratio = size.width as f32 / size.height as f32;
         self.renderer.recreate_render_attachments(size);
     }
