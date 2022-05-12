@@ -73,7 +73,7 @@ impl App {
         }
 
         self.scene.camera.aspect_ratio = size.width as f32 / size.height as f32;
-        self.renderer.recreate_render_attachments(size);
+        self.renderer.resize(size.width, size.height);
     }
 
     pub fn on_mouse_up(&mut self) {

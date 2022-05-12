@@ -11,9 +11,6 @@ use winit::{dpi::PhysicalSize, window::Window};
 
 use crate::entity::Scene;
 
-const COLOR_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba32Float;
-const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
-
 const QUAD_VERTICES: [Vec3; 4] = [
     const_vec3!([-0.5, -0.5, 0.]),
     const_vec3!([-0.5, 0.5, 0.]),
@@ -81,12 +78,10 @@ struct CompositeUniforms {
 }
 
 pub struct Renderer {
-    surface: wgpu::Surface,
+    surface: Surface,
     device: wgpu::Device,
     queue: wgpu::Queue,
-    surface_format: wgpu::TextureFormat,
-    offscreen_color_texture_view: wgpu::TextureView,
-    depth_texture_view: wgpu::TextureView,
+    frame_buffers: FrameBuffers,
     staging_belt: wgpu::util::StagingBelt,
     uniform_buffer: wgpu::Buffer,
     render_bundle: wgpu::RenderBundle,
@@ -110,6 +105,10 @@ impl Renderer {
             .await
             .context("No adapter found")?;
 
+        let surface_format = surface
+            .get_preferred_format(&adapter)
+            .context("No preferred format found")?;
+
         let (device, queue) = adapter
             .request_device(
                 &wgpu::DeviceDescriptor {
@@ -121,16 +120,15 @@ impl Renderer {
             )
             .await?;
 
-        let surface_format = surface
-            .get_preferred_format(&adapter)
-            .context("No preferred format found")?;
-
         let PhysicalSize { width, height } = window.inner_size();
 
-        configure_surface(&device, &surface, surface_format, width, height);
-        let offscreen_color_texture_view =
-            create_offscreen_color_texture_view(&device, width, height);
-        let depth_texture_view = create_depth_texture_view(&device, width, height);
+        let surface = Surface {
+            wgpu_surface: surface,
+            texture_format: surface_format,
+        };
+        surface.configure(&device, width, height);
+
+        let frame_buffers = FrameBuffers::new(&device, width, height);
 
         let staging_belt = wgpu::util::StagingBelt::new(
             (size_of::<Uniforms>() + size_of::<CompositeUniforms>()) as _,
@@ -255,7 +253,7 @@ impl Renderer {
             fragment: Some(wgpu::FragmentState {
                 module: &shader_module,
                 entry_point: "fs_main",
-                targets: &[COLOR_FORMAT.into()],
+                targets: &[FrameBuffers::COLOR_FORMAT.into()],
             }),
             primitive: wgpu::PrimitiveState {
                 topology: wgpu::PrimitiveTopology::TriangleList,
@@ -267,7 +265,7 @@ impl Renderer {
                 conservative: false,
             },
             depth_stencil: Some(wgpu::DepthStencilState {
-                format: DEPTH_FORMAT,
+                format: FrameBuffers::DEPTH_FORMAT,
                 depth_write_enabled: true,
                 depth_compare: wgpu::CompareFunction::LessEqual,
                 stencil: wgpu::StencilState::default(),
@@ -284,9 +282,9 @@ impl Renderer {
         let mut encoder =
             device.create_render_bundle_encoder(&wgpu::RenderBundleEncoderDescriptor {
                 label: None,
-                color_formats: &[COLOR_FORMAT],
+                color_formats: &[FrameBuffers::COLOR_FORMAT],
                 depth_stencil: Some(wgpu::RenderBundleDepthStencil {
-                    format: DEPTH_FORMAT,
+                    format: FrameBuffers::DEPTH_FORMAT,
                     depth_read_only: false,
                     stencil_read_only: true,
                 }),
@@ -354,7 +352,7 @@ impl Renderer {
                 },
                 wgpu::BindGroupEntry {
                     binding: 1,
-                    resource: wgpu::BindingResource::TextureView(&offscreen_color_texture_view),
+                    resource: wgpu::BindingResource::TextureView(&frame_buffers.color_texture_view),
                 },
             ],
         });
@@ -398,11 +396,9 @@ impl Renderer {
             surface,
             device,
             queue,
-            surface_format,
+            frame_buffers,
             staging_belt,
             uniform_buffer,
-            offscreen_color_texture_view,
-            depth_texture_view,
             render_bundle,
             composite_uniform_buffer,
             composite_bind_group_layout: bind_group_layout,
@@ -411,21 +407,10 @@ impl Renderer {
         })
     }
 
-    pub fn recreate_render_attachments(
-        &mut self,
-        PhysicalSize { width, height }: PhysicalSize<u32>,
-    ) {
-        configure_surface(
-            &self.device,
-            &self.surface,
-            self.surface_format,
-            width,
-            height,
-        );
+    pub fn resize(&mut self, width: u32, height: u32) {
+        self.surface.configure(&self.device, width, height);
 
-        self.offscreen_color_texture_view =
-            create_offscreen_color_texture_view(&self.device, width, height);
-        self.depth_texture_view = create_depth_texture_view(&self.device, width, height);
+        self.frame_buffers.resize(&self.device, width, height);
 
         self.composite_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: None,
@@ -438,7 +423,7 @@ impl Renderer {
                 wgpu::BindGroupEntry {
                     binding: 1,
                     resource: wgpu::BindingResource::TextureView(
-                        &self.offscreen_color_texture_view,
+                        &self.frame_buffers.color_texture_view,
                     ),
                 },
             ],
@@ -449,12 +434,13 @@ impl Renderer {
         let uniforms = Uniforms::new(&scene);
         let composite_uniforms = CompositeUniforms { exposure: 1.0 };
 
-        let frame_buffer = self
+        let surface_texture = self
             .surface
+            .wgpu_surface
             .get_current_texture()
             .expect("Failed to get next surface texture");
 
-        let frame_buffer_view = frame_buffer.texture.create_view(&Default::default());
+        let surface_texture_view = surface_texture.texture.create_view(&Default::default());
 
         let mut encoder = self.device.create_command_encoder(&Default::default());
 
@@ -482,7 +468,7 @@ impl Renderer {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: None,
                 color_attachments: &[wgpu::RenderPassColorAttachment {
-                    view: &self.offscreen_color_texture_view,
+                    view: &self.frame_buffers.color_texture_view,
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
@@ -490,7 +476,7 @@ impl Renderer {
                     },
                 }],
                 depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                    view: &self.depth_texture_view,
+                    view: &self.frame_buffers.depth_texture_view,
                     depth_ops: Some(wgpu::Operations {
                         load: wgpu::LoadOp::Clear(1.0),
                         store: true,
@@ -505,7 +491,7 @@ impl Renderer {
             let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: None,
                 color_attachments: &[wgpu::RenderPassColorAttachment {
-                    view: &frame_buffer_view,
+                    view: &surface_texture_view,
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
@@ -521,78 +507,107 @@ impl Renderer {
 
         self.queue.submit(Some(encoder.finish()));
 
-        frame_buffer.present();
+        surface_texture.present();
 
         self.staging_belt.recall()
     }
 }
 
-fn configure_surface(
-    device: &wgpu::Device,
-    surface: &wgpu::Surface,
-    format: wgpu::TextureFormat,
-    width: u32,
-    height: u32,
-) {
-    surface.configure(
-        device,
-        &wgpu::SurfaceConfiguration {
+struct Surface {
+    wgpu_surface: wgpu::Surface,
+    texture_format: wgpu::TextureFormat,
+}
+
+impl Surface {
+    fn configure(&self, device: &wgpu::Device, width: u32, height: u32) {
+        self.wgpu_surface.configure(
+            device,
+            &wgpu::SurfaceConfiguration {
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+                format: self.texture_format,
+                width,
+                height,
+                present_mode: wgpu::PresentMode::Fifo,
+            },
+        );
+    }
+}
+
+struct FrameBuffers {
+    color_texture: wgpu::Texture,
+    color_texture_view: wgpu::TextureView,
+    depth_texture: wgpu::Texture,
+    depth_texture_view: wgpu::TextureView,
+}
+
+impl FrameBuffers {
+    const COLOR_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba32Float;
+    const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
+
+    fn new(device: &wgpu::Device, width: u32, height: u32) -> Self {
+        let color_texture = Self::create_color_texture(device, width, height);
+        let color_texture_view = Self::create_color_texture_view(&color_texture);
+
+        let depth_texture = Self::create_depth_texture(device, width, height);
+        let depth_texture_view = Self::create_depth_texture_view(&depth_texture);
+
+        Self {
+            color_texture,
+            color_texture_view,
+            depth_texture,
+            depth_texture_view,
+        }
+    }
+
+    fn create_color_texture(device: &wgpu::Device, width: u32, height: u32) -> wgpu::Texture {
+        device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("Offscreen Color Texture"),
+            size: wgpu::Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: Self::COLOR_FORMAT,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+        })
+    }
+
+    fn create_color_texture_view(texture: &wgpu::Texture) -> wgpu::TextureView {
+        texture.create_view(&wgpu::TextureViewDescriptor {
+            ..Default::default()
+        })
+    }
+
+    fn create_depth_texture(device: &wgpu::Device, width: u32, height: u32) -> wgpu::Texture {
+        device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("Depth Texture"),
+            size: wgpu::Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: Self::DEPTH_FORMAT,
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            format,
-            width,
-            height,
-            present_mode: wgpu::PresentMode::Fifo,
-        },
-    );
-}
+        })
+    }
 
-fn create_offscreen_color_texture_view(
-    device: &wgpu::Device,
-    width: u32,
-    height: u32,
-) -> wgpu::TextureView {
-    let texture = device.create_texture(&wgpu::TextureDescriptor {
-        label: Some("Offscreen color texture"),
-        size: wgpu::Extent3d {
-            width,
-            height,
-            depth_or_array_layers: 1,
-        },
-        mip_level_count: 1,
-        sample_count: 1,
-        dimension: wgpu::TextureDimension::D2,
-        format: COLOR_FORMAT,
-        usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
-    });
+    fn create_depth_texture_view(texture: &wgpu::Texture) -> wgpu::TextureView {
+        texture.create_view(&wgpu::TextureViewDescriptor {
+            aspect: wgpu::TextureAspect::DepthOnly,
+            ..Default::default()
+        })
+    }
 
-    texture.create_view(&wgpu::TextureViewDescriptor {
-        ..Default::default()
-    })
-}
-
-fn create_depth_texture_view(device: &wgpu::Device, width: u32, height: u32) -> wgpu::TextureView {
-    let depth_texture = device.create_texture(&wgpu::TextureDescriptor {
-        label: Some("Depth texture"),
-        size: wgpu::Extent3d {
-            width,
-            height,
-            depth_or_array_layers: 1,
-        },
-        mip_level_count: 1,
-        sample_count: 1,
-        dimension: wgpu::TextureDimension::D2,
-        format: DEPTH_FORMAT,
-        usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-    });
-
-    depth_texture.create_view(&wgpu::TextureViewDescriptor {
-        label: Some("Depth texture view"),
-        format: Some(DEPTH_FORMAT),
-        dimension: Some(wgpu::TextureViewDimension::D2),
-        aspect: wgpu::TextureAspect::DepthOnly,
-        base_mip_level: 0,
-        mip_level_count: None,
-        base_array_layer: 0,
-        array_layer_count: None,
-    })
+    fn resize(&mut self, device: &wgpu::Device, width: u32, height: u32) {
+        self.color_texture = Self::create_color_texture(device, width, height);
+        self.color_texture_view = Self::create_color_texture_view(&self.color_texture);
+        self.depth_texture = Self::create_depth_texture(device, width, height);
+        self.depth_texture_view = Self::create_depth_texture_view(&self.depth_texture);
+    }
 }
