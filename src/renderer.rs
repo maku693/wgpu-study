@@ -21,14 +21,14 @@ const QUAD_INDICES: [u16; 6] = [0, 2, 1, 1, 2, 3];
 
 #[derive(Debug, Copy, Clone, Default, Pod, Zeroable)]
 #[repr(C)]
-struct Uniforms {
+struct ParticleUniforms {
     mv_mat: Mat4,
     p_mat: Mat4,
     particle_size: f32,
     _pad0: [u8; 12],
 }
 
-impl Uniforms {
+impl ParticleUniforms {
     fn new(scene: &Scene) -> Self {
         let Scene {
             camera,
@@ -64,7 +64,7 @@ impl Uniforms {
 
 #[derive(Debug, Copy, Clone, Default, Pod, Zeroable)]
 #[repr(C)]
-struct Instance {
+struct ParticleInstance {
     position: Vec3,
     _pad0: [u8; 4],
     color: Vec3,
@@ -136,12 +136,12 @@ impl Renderer {
         let frame_buffers = FrameBuffers::new(&device, width, height);
 
         let staging_belt = wgpu::util::StagingBelt::new(
-            (size_of::<Uniforms>() + size_of::<CompositeUniforms>()) as _,
+            (size_of::<ParticleUniforms>() + size_of::<CompositeUniforms>()) as _,
         );
 
         let particle_uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Uniform Buffer"),
-            size: size_of::<Uniforms>() as _,
+            size: size_of::<ParticleUniforms>() as _,
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
@@ -168,7 +168,7 @@ impl Renderer {
                 info!("Seeded RNG with {}", rand_seed);
 
                 let instances: Vec<_> = (0..scene.particle_system.max_count)
-                    .map(|_| Instance {
+                    .map(|_| ParticleInstance {
                         position: vec3(
                             rng.gen_range(0.0..1.0),
                             rng.gen_range(0.0..1.0),
@@ -201,7 +201,9 @@ impl Renderer {
                             ty: wgpu::BindingType::Buffer {
                                 ty: wgpu::BufferBindingType::Storage { read_only: true },
                                 has_dynamic_offset: false,
-                                min_binding_size: wgpu::BufferSize::new(size_of::<Instance>() as _),
+                                min_binding_size: wgpu::BufferSize::new(
+                                    size_of::<ParticleInstance>() as _,
+                                ),
                             },
                             count: None,
                         },
@@ -211,7 +213,9 @@ impl Renderer {
                             ty: wgpu::BindingType::Buffer {
                                 ty: wgpu::BufferBindingType::Uniform,
                                 has_dynamic_offset: false,
-                                min_binding_size: wgpu::BufferSize::new(size_of::<Uniforms>() as _),
+                                min_binding_size: wgpu::BufferSize::new(
+                                    size_of::<ParticleUniforms>() as _,
+                                ),
                             },
                             count: None,
                         },
@@ -316,7 +320,7 @@ impl Renderer {
 
         let composite_uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Composite pass uniform buffer"),
-            size: size_of::<Uniforms>() as _,
+            size: size_of::<ParticleUniforms>() as _,
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
@@ -445,7 +449,7 @@ impl Renderer {
     }
 
     pub fn render(&mut self, scene: &Scene) -> impl Future<Output = ()> {
-        let uniforms = Uniforms::new(&scene);
+        let uniforms = ParticleUniforms::new(&scene);
         let composite_uniforms = CompositeUniforms::new(&scene);
 
         let surface_texture = self
@@ -463,7 +467,7 @@ impl Renderer {
                 &mut encoder,
                 &self.particle_uniform_buffer,
                 0,
-                wgpu::BufferSize::new(size_of::<Uniforms>() as _).unwrap(),
+                wgpu::BufferSize::new(size_of::<ParticleUniforms>() as _).unwrap(),
                 &self.device,
             )
             .copy_from_slice(bytes_of(&uniforms));
