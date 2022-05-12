@@ -38,6 +38,7 @@ impl App {
                     aspect_ratio,
                     near: 0.1,
                     far: 1000.,
+                    exposure: 1.0,
                 }
             },
             particle_system: ParticleSystem {
@@ -88,6 +89,14 @@ impl App {
                 self.window.set_cursor_grab(false).unwrap();
                 self.window.set_cursor_visible(true);
                 self.cursor_locked = false;
+            }
+            VirtualKeyCode::K => {
+                self.scene.camera.exposure += 1.0;
+                info!("Camera exposure increased: {}", self.scene.camera.exposure);
+            }
+            VirtualKeyCode::J => {
+                self.scene.camera.exposure -= 1.0;
+                info!("Camera exposure decreased: {}", self.scene.camera.exposure);
             }
             _ => (),
         }

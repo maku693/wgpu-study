@@ -77,6 +77,14 @@ struct CompositeUniforms {
     exposure: f32,
 }
 
+impl CompositeUniforms {
+    fn new(scene: &Scene) -> Self {
+        Self {
+            exposure: scene.camera.exposure,
+        }
+    }
+}
+
 pub struct Renderer {
     surface: Surface,
     device: wgpu::Device,
@@ -434,7 +442,7 @@ impl Renderer {
 
     pub fn render(&mut self, scene: &Scene) -> impl Future<Output = ()> {
         let uniforms = Uniforms::new(&scene);
-        let composite_uniforms = CompositeUniforms { exposure: 1.0 };
+        let composite_uniforms = CompositeUniforms::new(&scene);
 
         let surface_texture = self
             .surface

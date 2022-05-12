@@ -14,6 +14,7 @@ pub struct Camera {
     pub aspect_ratio: f32,
     pub near: f32,
     pub far: f32,
+    pub exposure: f32,
 }
 
 #[derive(Debug, Copy, Clone, Default)]
