@@ -83,8 +83,8 @@ pub struct Renderer {
     queue: wgpu::Queue,
     frame_buffers: FrameBuffers,
     staging_belt: wgpu::util::StagingBelt,
-    uniform_buffer: wgpu::Buffer,
-    render_bundle: wgpu::RenderBundle,
+    particle_uniform_buffer: wgpu::Buffer,
+    particle_render_bundle: wgpu::RenderBundle,
     composite_uniform_buffer: wgpu::Buffer,
     composite_bind_group_layout: wgpu::BindGroupLayout,
     composite_bind_group: wgpu::BindGroup,
@@ -131,177 +131,180 @@ impl Renderer {
             (size_of::<Uniforms>() + size_of::<CompositeUniforms>()) as _,
         );
 
-        let uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("Uniform buffer"),
+        let particle_uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Uniform Buffer"),
             size: size_of::<Uniforms>() as _,
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
 
-        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Particle vertex buffer"),
-            contents: bytes_of(&QUAD_VERTICES),
-            usage: wgpu::BufferUsages::VERTEX,
-        });
-        let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Particle index buffer"),
-            contents: bytes_of(&QUAD_INDICES),
-            usage: wgpu::BufferUsages::INDEX,
-        });
+        let particle_render_bundle = {
+            let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Particle Vertex Buffer"),
+                contents: bytes_of(&QUAD_VERTICES),
+                usage: wgpu::BufferUsages::VERTEX,
+            });
+            let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Particle Index Buffer"),
+                contents: bytes_of(&QUAD_INDICES),
+                usage: wgpu::BufferUsages::INDEX,
+            });
 
-        let instance_buffer = {
-            let rand_seed = SystemTime::now()
-                .duration_since(SystemTime::UNIX_EPOCH)
-                .unwrap()
-                .as_millis() as _;
+            let instance_buffer = {
+                let rand_seed = SystemTime::now()
+                    .duration_since(SystemTime::UNIX_EPOCH)
+                    .unwrap()
+                    .as_millis() as _;
 
-            let mut rng = Pcg64Mcg::seed_from_u64(rand_seed);
-            info!("Seeded RNG with {}", rand_seed);
+                let mut rng = Pcg64Mcg::seed_from_u64(rand_seed);
+                info!("Seeded RNG with {}", rand_seed);
 
-            let instances: Vec<_> = (0..scene.particle_system.max_count)
-                .map(|_| Instance {
-                    position: vec3(
-                        rng.gen_range(0.0..1.0),
-                        rng.gen_range(0.0..1.0),
-                        rng.gen_range(0.0..1.0),
-                    ) - 0.5,
-                    color: vec3(
-                        rng.gen_range(0.0..1.0),
-                        rng.gen_range(0.0..1.0),
-                        rng.gen_range(0.0..1.0),
-                    )
-                    .normalize()
-                        * 2.0,
-                    ..Default::default()
+                let instances: Vec<_> = (0..scene.particle_system.max_count)
+                    .map(|_| Instance {
+                        position: vec3(
+                            rng.gen_range(0.0..1.0),
+                            rng.gen_range(0.0..1.0),
+                            rng.gen_range(0.0..1.0),
+                        ) - 0.5,
+                        color: vec3(
+                            rng.gen_range(0.0..1.0),
+                            rng.gen_range(0.0..1.0),
+                            rng.gen_range(0.0..1.0),
+                        )
+                        .normalize()
+                            * 2.0,
+                        ..Default::default()
+                    })
+                    .collect();
+                device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("Instance buffer"),
+                    contents: cast_slice(instances.as_slice()),
+                    usage: wgpu::BufferUsages::STORAGE,
                 })
-                .collect();
-            device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("Instance buffer"),
-                contents: cast_slice(instances.as_slice()),
-                usage: wgpu::BufferUsages::STORAGE,
-            })
-        };
+            };
 
-        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: None,
-            entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::VERTEX,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Storage { read_only: true },
-                        has_dynamic_offset: false,
-                        min_binding_size: wgpu::BufferSize::new(size_of::<Instance>() as _),
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::VERTEX,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: wgpu::BufferSize::new(size_of::<Uniforms>() as _),
-                    },
-                    count: None,
-                },
-            ],
-        });
+            let bind_group_layout =
+                device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                    label: None,
+                    entries: &[
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 0,
+                            visibility: wgpu::ShaderStages::VERTEX,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Storage { read_only: true },
+                                has_dynamic_offset: false,
+                                min_binding_size: wgpu::BufferSize::new(size_of::<Instance>() as _),
+                            },
+                            count: None,
+                        },
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 1,
+                            visibility: wgpu::ShaderStages::VERTEX,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Uniform,
+                                has_dynamic_offset: false,
+                                min_binding_size: wgpu::BufferSize::new(size_of::<Uniforms>() as _),
+                            },
+                            count: None,
+                        },
+                    ],
+                });
 
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: None,
-            layout: &bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: instance_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: uniform_buffer.as_entire_binding(),
-                },
-            ],
-        });
-
-        let shader_module = device.create_shader_module(&wgpu::include_wgsl!("particle.wgsl"));
-
-        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: None,
-            bind_group_layouts: &[&bind_group_layout],
-            push_constant_ranges: &[],
-        });
-
-        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: None,
-            layout: Some(&pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &shader_module,
-                entry_point: "vs_main",
-                buffers: &[wgpu::VertexBufferLayout {
-                    array_stride: size_of::<Vec3>() as _,
-                    step_mode: wgpu::VertexStepMode::Vertex,
-                    attributes: &[wgpu::VertexAttribute {
-                        format: wgpu::VertexFormat::Float32x3,
-                        offset: 0,
-                        shader_location: 0,
-                    }],
-                }],
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &shader_module,
-                entry_point: "fs_main",
-                targets: &[FrameBuffers::COLOR_FORMAT.into()],
-            }),
-            primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::TriangleList,
-                strip_index_format: None,
-                front_face: wgpu::FrontFace::Ccw,
-                cull_mode: Some(wgpu::Face::Back),
-                unclipped_depth: false,
-                polygon_mode: wgpu::PolygonMode::Fill,
-                conservative: false,
-            },
-            depth_stencil: Some(wgpu::DepthStencilState {
-                format: FrameBuffers::DEPTH_FORMAT,
-                depth_write_enabled: true,
-                depth_compare: wgpu::CompareFunction::LessEqual,
-                stencil: wgpu::StencilState::default(),
-                bias: wgpu::DepthBiasState {
-                    constant: 0,
-                    slope_scale: 0.0,
-                    clamp: 0.0,
-                },
-            }),
-            multisample: wgpu::MultisampleState::default(),
-            multiview: None,
-        });
-
-        let mut encoder =
-            device.create_render_bundle_encoder(&wgpu::RenderBundleEncoderDescriptor {
+            let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
                 label: None,
-                color_formats: &[FrameBuffers::COLOR_FORMAT],
-                depth_stencil: Some(wgpu::RenderBundleDepthStencil {
-                    format: FrameBuffers::DEPTH_FORMAT,
-                    depth_read_only: false,
-                    stencil_read_only: true,
+                layout: &bind_group_layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: instance_buffer.as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: particle_uniform_buffer.as_entire_binding(),
+                    },
+                ],
+            });
+
+            let shader_module = device.create_shader_module(&wgpu::include_wgsl!("particle.wgsl"));
+
+            let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: None,
+                bind_group_layouts: &[&bind_group_layout],
+                push_constant_ranges: &[],
+            });
+
+            let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: None,
+                layout: Some(&pipeline_layout),
+                vertex: wgpu::VertexState {
+                    module: &shader_module,
+                    entry_point: "vs_main",
+                    buffers: &[wgpu::VertexBufferLayout {
+                        array_stride: size_of::<Vec3>() as _,
+                        step_mode: wgpu::VertexStepMode::Vertex,
+                        attributes: &[wgpu::VertexAttribute {
+                            format: wgpu::VertexFormat::Float32x3,
+                            offset: 0,
+                            shader_location: 0,
+                        }],
+                    }],
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: &shader_module,
+                    entry_point: "fs_main",
+                    targets: &[FrameBuffers::COLOR_FORMAT.into()],
                 }),
-                sample_count: 1,
+                primitive: wgpu::PrimitiveState {
+                    topology: wgpu::PrimitiveTopology::TriangleList,
+                    strip_index_format: None,
+                    front_face: wgpu::FrontFace::Ccw,
+                    cull_mode: Some(wgpu::Face::Back),
+                    unclipped_depth: false,
+                    polygon_mode: wgpu::PolygonMode::Fill,
+                    conservative: false,
+                },
+                depth_stencil: Some(wgpu::DepthStencilState {
+                    format: FrameBuffers::DEPTH_FORMAT,
+                    depth_write_enabled: true,
+                    depth_compare: wgpu::CompareFunction::LessEqual,
+                    stencil: wgpu::StencilState::default(),
+                    bias: wgpu::DepthBiasState {
+                        constant: 0,
+                        slope_scale: 0.0,
+                        clamp: 0.0,
+                    },
+                }),
+                multisample: wgpu::MultisampleState::default(),
                 multiview: None,
             });
 
-        encoder.set_bind_group(0, &bind_group, &[]);
-        encoder.set_pipeline(&render_pipeline);
-        encoder.set_vertex_buffer(0, vertex_buffer.slice(..));
-        encoder.set_index_buffer(index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-        encoder.draw_indexed(
-            0..(QUAD_INDICES.len() as _),
-            0,
-            0..scene.particle_system.max_count,
-        );
+            let mut encoder =
+                device.create_render_bundle_encoder(&wgpu::RenderBundleEncoderDescriptor {
+                    label: None,
+                    color_formats: &[FrameBuffers::COLOR_FORMAT],
+                    depth_stencil: Some(wgpu::RenderBundleDepthStencil {
+                        format: FrameBuffers::DEPTH_FORMAT,
+                        depth_read_only: false,
+                        stencil_read_only: true,
+                    }),
+                    sample_count: 1,
+                    multiview: None,
+                });
 
-        let render_bundle = encoder.finish(&wgpu::RenderBundleDescriptor {
-            label: Some("Particle render bundle"),
-        });
+            encoder.set_bind_group(0, &bind_group, &[]);
+            encoder.set_pipeline(&render_pipeline);
+            encoder.set_vertex_buffer(0, vertex_buffer.slice(..));
+            encoder.set_index_buffer(index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+            encoder.draw_indexed(
+                0..(QUAD_INDICES.len() as _),
+                0,
+                0..scene.particle_system.max_count,
+            );
+
+            encoder.finish(&wgpu::RenderBundleDescriptor {
+                label: Some("Particle Render Bundle"),
+            })
+        };
 
         let composite_uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Composite pass uniform buffer"),
@@ -310,7 +313,7 @@ impl Renderer {
             mapped_at_creation: false,
         });
 
-        let bind_group_layout =
+        let composite_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 label: None,
                 entries: &[
@@ -339,9 +342,9 @@ impl Renderer {
                 ],
             });
 
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        let composite_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: None,
-            layout: &bind_group_layout,
+            layout: &composite_bind_group_layout,
             entries: &[
                 wgpu::BindGroupEntry {
                     binding: 0,
@@ -354,40 +357,42 @@ impl Renderer {
             ],
         });
 
-        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: None,
-            bind_group_layouts: &[&bind_group_layout],
-            push_constant_ranges: &[],
-        });
+        let composite_render_pipeline = {
+            let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: None,
+                bind_group_layouts: &[&composite_bind_group_layout],
+                push_constant_ranges: &[],
+            });
 
-        let shader_module = device.create_shader_module(&wgpu::include_wgsl!("composite.wgsl"));
+            let shader_module = device.create_shader_module(&wgpu::include_wgsl!("composite.wgsl"));
 
-        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: None,
-            layout: Some(&pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &shader_module,
-                entry_point: "vs_main",
-                buffers: &[],
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &shader_module,
-                entry_point: "fs_main",
-                targets: &[surface_format.into()],
-            }),
-            primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::TriangleList,
-                strip_index_format: None,
-                front_face: wgpu::FrontFace::Ccw,
-                cull_mode: Some(wgpu::Face::Back),
-                unclipped_depth: false,
-                polygon_mode: wgpu::PolygonMode::Fill,
-                conservative: false,
-            },
-            depth_stencil: None,
-            multisample: wgpu::MultisampleState::default(),
-            multiview: None,
-        });
+            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: None,
+                layout: Some(&pipeline_layout),
+                vertex: wgpu::VertexState {
+                    module: &shader_module,
+                    entry_point: "vs_main",
+                    buffers: &[],
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: &shader_module,
+                    entry_point: "fs_main",
+                    targets: &[surface_format.into()],
+                }),
+                primitive: wgpu::PrimitiveState {
+                    topology: wgpu::PrimitiveTopology::TriangleList,
+                    strip_index_format: None,
+                    front_face: wgpu::FrontFace::Ccw,
+                    cull_mode: Some(wgpu::Face::Back),
+                    unclipped_depth: false,
+                    polygon_mode: wgpu::PolygonMode::Fill,
+                    conservative: false,
+                },
+                depth_stencil: None,
+                multisample: wgpu::MultisampleState::default(),
+                multiview: None,
+            })
+        };
 
         Ok(Self {
             surface,
@@ -395,12 +400,12 @@ impl Renderer {
             queue,
             frame_buffers,
             staging_belt,
-            uniform_buffer,
-            render_bundle,
+            particle_uniform_buffer,
+            particle_render_bundle,
             composite_uniform_buffer,
-            composite_bind_group_layout: bind_group_layout,
-            composite_bind_group: bind_group,
-            composite_render_pipeline: render_pipeline,
+            composite_bind_group_layout,
+            composite_bind_group,
+            composite_render_pipeline,
         })
     }
 
@@ -444,7 +449,7 @@ impl Renderer {
         self.staging_belt
             .write_buffer(
                 &mut encoder,
-                &self.uniform_buffer,
+                &self.particle_uniform_buffer,
                 0,
                 wgpu::BufferSize::new(size_of::<Uniforms>() as _).unwrap(),
                 &self.device,
@@ -481,7 +486,7 @@ impl Renderer {
                     stencil_ops: None,
                 }),
             });
-            render_pass.execute_bundles(Some(&self.render_bundle));
+            render_pass.execute_bundles(Some(&self.particle_render_bundle));
         }
 
         {
