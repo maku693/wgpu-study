@@ -122,10 +122,7 @@ impl Renderer {
 
         let PhysicalSize { width, height } = window.inner_size();
 
-        let surface = Surface {
-            wgpu_surface: surface,
-            texture_format: surface_format,
-        };
+        let surface = Surface::new(surface, surface_format);
         surface.configure(&device, width, height);
 
         let frame_buffers = FrameBuffers::new(&device, width, height);
@@ -519,6 +516,13 @@ struct Surface {
 }
 
 impl Surface {
+    fn new(wgpu_surface: wgpu::Surface, texture_format: wgpu::TextureFormat) -> Self {
+        Self {
+            wgpu_surface,
+            texture_format,
+        }
+    }
+
     fn configure(&self, device: &wgpu::Device, width: u32, height: u32) {
         self.wgpu_surface.configure(
             device,
