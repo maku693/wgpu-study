@@ -566,8 +566,8 @@ struct FrameBuffers {
 }
 
 impl FrameBuffers {
-    const COLOR_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba32Float;
-    const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
+    const COLOR_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba16Float;
+    const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth24PlusStencil8;
 
     fn new(device: &wgpu::Device, width: u32, height: u32) -> Self {
         let color_texture = Self::create_color_texture(device, width, height);
