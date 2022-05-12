@@ -350,20 +350,12 @@ impl Renderer {
                 ],
             });
 
-        let composite_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: None,
-            layout: &composite_bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: composite_uniform_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::TextureView(&frame_buffers.color_texture_view),
-                },
-            ],
-        });
+        let composite_bind_group = Self::create_composite_bind_group(
+            &device,
+            &composite_bind_group_layout,
+            &composite_uniform_buffer,
+            &frame_buffers.color_texture_view,
+        );
 
         let composite_render_pipeline = {
             let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -417,27 +409,39 @@ impl Renderer {
         })
     }
 
+    fn create_composite_bind_group(
+        device: &wgpu::Device,
+        layout: &wgpu::BindGroupLayout,
+        uniform_buffer: &wgpu::Buffer,
+        color_texture_view: &wgpu::TextureView,
+    ) -> wgpu::BindGroup {
+        device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: None,
+            layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: uniform_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::TextureView(color_texture_view),
+                },
+            ],
+        })
+    }
+
     pub fn resize(&mut self, width: u32, height: u32) {
         self.surface.configure(&self.device, width, height);
 
         self.frame_buffers.resize(&self.device, width, height);
 
-        self.composite_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: None,
-            layout: &self.composite_bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: self.composite_uniform_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::TextureView(
-                        &self.frame_buffers.color_texture_view,
-                    ),
-                },
-            ],
-        });
+        self.composite_bind_group = Self::create_composite_bind_group(
+            &self.device,
+            &self.composite_bind_group_layout,
+            &self.composite_uniform_buffer,
+            &self.frame_buffers.color_texture_view,
+        );
     }
 
     pub fn render(&mut self, scene: &Scene) -> impl Future<Output = ()> {
