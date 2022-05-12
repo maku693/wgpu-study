@@ -91,11 +91,11 @@ impl App {
                 self.cursor_locked = false;
             }
             VirtualKeyCode::K => {
-                self.scene.camera.exposure += 1.0;
+                self.scene.camera.exposure += 0.1;
                 info!("Camera exposure increased: {}", self.scene.camera.exposure);
             }
             VirtualKeyCode::J => {
-                self.scene.camera.exposure -= 1.0;
+                self.scene.camera.exposure -= 0.1;
                 info!("Camera exposure decreased: {}", self.scene.camera.exposure);
             }
             _ => (),
