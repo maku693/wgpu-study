@@ -35,8 +35,7 @@ var<uniform> uniforms: Uniforms;
 
 @fragment
 fn fs_bright(@location(0) tex_coord: vec2<f16>) -> @location(0) vec4<f32> {
-  _ = uniforms.threshold;
-  var color = vec4<f32>(1.0, 1.0, 1.0, 1.0);
+  var color = vec4<f32>(1.0, 1.0, 1.0, 1.0) * vec4<f32>(uniforms.intensity) - vec4<f32>(uniforms.threshold);
   return color;
 }
 
