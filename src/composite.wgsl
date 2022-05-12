@@ -42,5 +42,5 @@ fn fs_main(@location(0) tex_coord: vec2<f32>) -> @location(0) vec4<f32> {
     vec2<i32>(tex_coord * vec2<f32>(resolution)),
     0,
   );
-  return color * uniforms.exposure;
+  return pow(color * uniforms.exposure, vec4<f32>(2.2));
 }
