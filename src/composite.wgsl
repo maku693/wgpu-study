@@ -37,11 +37,11 @@ var color_texture: texture_2d<f32>;
 var color_sampler: sampler;
 
 var<private> blur_fetches: array<vec2<f32>, 5> = array<vec2<f32>, 5>(
-  vec2<f32>(0.0, 0.0),
-  vec2<f32>(-0.5, -0.5),
-  vec2<f32>(0.5, -0.5),
-  vec2<f32>(-0.5, 0.5),
   vec2<f32>(0.5, 0.5),
+  vec2<f32>(0.0, 0.0),
+  vec2<f32>(1.0, 0.0),
+  vec2<f32>(0.0, 1.0),
+  vec2<f32>(1.0, 1.0),
 );
 
 @fragment
