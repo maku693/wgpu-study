@@ -11,7 +11,7 @@ use winit::{
 };
 
 use crate::{
-    entity::{Camera, ParticleSystem, Scene, Transform},
+    entity::{BloomEffect, Camera, ParticleSystem, Scene, Transform},
     renderer::Renderer,
 };
 
@@ -52,6 +52,10 @@ impl App {
                 lifetime: 0,
                 min_speed: 0.01,
                 max_speed: 1.,
+            },
+            bloom_effect: BloomEffect {
+                intensity: 1.0,
+                threshold: 1.0,
             },
         };
         info!("{:#?}", &scene);

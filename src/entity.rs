@@ -28,7 +28,14 @@ pub struct ParticleSystem {
 }
 
 #[derive(Debug, Copy, Clone, Default)]
+pub struct BloomEffect {
+    pub intensity: u32,
+    pub threshold: u32,
+}
+
+#[derive(Debug, Copy, Clone, Default)]
 pub struct Scene {
     pub camera: Camera,
     pub particle_system: ParticleSystem,
+    pub bloom_effect: BloomEffect,
 }
