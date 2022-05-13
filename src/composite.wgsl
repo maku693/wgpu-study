@@ -36,13 +36,28 @@ var color_texture: texture_2d<f32>;
 @group(0) @binding(2)
 var color_sampler: sampler;
 
+var<private> blur_fetches: array<vec2<f32>, 5> = array<vec2<f32>, 5>(
+  vec2<f32>(0.0, 0.0),
+  vec2<f32>(-0.5, -0.5),
+  vec2<f32>(0.5, -0.5),
+  vec2<f32>(-0.5, 0.5),
+  vec2<f32>(0.5, 0.5),
+);
+
 @fragment
 fn fs_main(@location(0) tex_coord: vec2<f32>) -> @location(0) vec4<f32> {
   let resolution = textureDimensions(color_texture);
-  var color = textureSample(
-    color_texture,
-    color_sampler,
-    tex_coord
-  );
+  let texel_size = vec2<f32>(1.0) / vec2<f32>(resolution);
+
+  var color = vec4<f32>(0.0);
+  for (var i = 0; i < 5; i++) {
+    color += textureSample(
+      color_texture,
+      color_sampler,
+      tex_coord + blur_fetches[i] * texel_size
+    );
+  }
+  color *= 0.2;
+
   return pow(color * uniforms.exposure, vec4<f32>(2.2));
 }
