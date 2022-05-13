@@ -29,8 +29,8 @@ pub struct ParticleSystem {
 
 #[derive(Debug, Copy, Clone, Default)]
 pub struct BloomEffect {
-    pub intensity: u32,
-    pub threshold: u32,
+    pub intensity: f32,
+    pub threshold: f32,
 }
 
 #[derive(Debug, Copy, Clone, Default)]
