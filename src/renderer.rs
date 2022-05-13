@@ -97,6 +97,7 @@ pub struct Renderer {
     composite_bind_group_layout: wgpu::BindGroupLayout,
     composite_bind_group: wgpu::BindGroup,
     composite_render_pipeline: wgpu::RenderPipeline,
+    sampler: wgpu::Sampler,
 }
 
 impl Renderer {
@@ -134,6 +135,13 @@ impl Renderer {
         surface.configure(&device, width, height);
 
         let frame_buffers = FrameBuffers::new(&device, width, height);
+
+        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("Sampler"),
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            ..Default::default()
+        });
 
         let staging_belt = wgpu::util::StagingBelt::new(
             (size_of::<ParticleUniforms>() + size_of::<CompositeUniforms>()) as _,
@@ -345,10 +353,16 @@ impl Renderer {
                         binding: 1,
                         visibility: wgpu::ShaderStages::FRAGMENT,
                         ty: wgpu::BindingType::Texture {
-                            sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
                             view_dimension: wgpu::TextureViewDimension::D2,
                             multisampled: false,
                         },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 2,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                         count: None,
                     },
                 ],
@@ -359,6 +373,7 @@ impl Renderer {
             &composite_bind_group_layout,
             &composite_uniform_buffer,
             &frame_buffers.color_texture_view,
+            &sampler,
         );
 
         let composite_render_pipeline = {
@@ -410,6 +425,7 @@ impl Renderer {
             composite_bind_group_layout,
             composite_bind_group,
             composite_render_pipeline,
+            sampler,
         })
     }
 
@@ -418,6 +434,7 @@ impl Renderer {
         layout: &wgpu::BindGroupLayout,
         uniform_buffer: &wgpu::Buffer,
         color_texture_view: &wgpu::TextureView,
+        sampler: &wgpu::Sampler,
     ) -> wgpu::BindGroup {
         device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: None,
@@ -430,6 +447,10 @@ impl Renderer {
                 wgpu::BindGroupEntry {
                     binding: 1,
                     resource: wgpu::BindingResource::TextureView(color_texture_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::Sampler(sampler),
                 },
             ],
         })
@@ -445,6 +466,7 @@ impl Renderer {
             &self.composite_bind_group_layout,
             &self.composite_uniform_buffer,
             &self.frame_buffers.color_texture_view,
+            &self.sampler,
         );
     }
 

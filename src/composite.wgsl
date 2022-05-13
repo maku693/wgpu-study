@@ -33,14 +33,16 @@ fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOut {
 var<uniform> uniforms: Uniforms;
 @group(0) @binding(1)
 var color_texture: texture_2d<f32>;
+@group(0) @binding(2)
+var color_sampler: sampler;
 
 @fragment
 fn fs_main(@location(0) tex_coord: vec2<f32>) -> @location(0) vec4<f32> {
   let resolution = textureDimensions(color_texture);
-  var color = textureLoad(
+  var color = textureSample(
     color_texture,
-    vec2<i32>(tex_coord * vec2<f32>(resolution)),
-    0,
+    color_sampler,
+    tex_coord
   );
   return pow(color * uniforms.exposure, vec4<f32>(2.2));
 }
