@@ -29,12 +29,7 @@ pub struct CompositeRenderer {
 impl CompositeRenderer {
     pub const STAGING_BUFFER_CHUNK_SIZE: wgpu::BufferAddress = size_of::<CompositeUniforms>() as _;
 
-    pub fn new(
-        device: &wgpu::Device,
-        frame_buffers: &FrameBuffers,
-        surface: &Surface,
-        _scene: &Scene,
-    ) -> Self {
+    pub fn new(device: &wgpu::Device, frame_buffers: &FrameBuffers, surface: &Surface) -> Self {
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
             label: Some("Sampler"),
             mag_filter: wgpu::FilterMode::Linear,
