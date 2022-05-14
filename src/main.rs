@@ -12,7 +12,10 @@ use crate::app::App;
 
 mod app;
 mod entity;
+mod frame_buffers;
+mod particle_pass;
 mod renderer;
+mod surface;
 
 fn main() -> Result<()> {
     env_logger::init();
