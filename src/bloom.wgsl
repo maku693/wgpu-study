@@ -1,8 +1,3 @@
-struct Uniforms {
-  threshold: f32,
-  intensity: f32,
-}
-
 struct VertexOut {
   @builtin(position) position: vec4<f32>,
   @location(0) tex_coord: vec2<f32>,
@@ -28,6 +23,11 @@ fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOut {
     position,
     tex_coord,
   );
+}
+
+struct Uniforms {
+  threshold: f32,
+  intensity: f32,
 }
 
 @group(0) @binding(0)
