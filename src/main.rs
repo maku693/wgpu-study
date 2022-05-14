@@ -11,6 +11,7 @@ use winit::{
 use crate::app::App;
 
 mod app;
+mod composite_pass;
 mod entity;
 mod frame_buffers;
 mod particle_pass;

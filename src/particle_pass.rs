@@ -291,7 +291,7 @@ impl ParticleRenderer {
             .copy_from_slice(bytes_of(&uniforms));
     }
 
-    pub fn draw(&self, frame_buffers: &FrameBuffers, encoder: &mut wgpu::CommandEncoder) {
+    pub fn draw(&self, encoder: &mut wgpu::CommandEncoder, frame_buffers: &FrameBuffers) {
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: None,
             color_attachments: &[wgpu::RenderPassColorAttachment {
