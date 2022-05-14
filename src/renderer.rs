@@ -60,7 +60,7 @@ impl Renderer {
         let frame_buffers = FrameBuffers::new(&device, width, height);
 
         let particle_renderer = ParticleRenderer::new(&device, scene);
-        let composite_renderer = CompositeRenderer::new(&device, &frame_buffers, &surface, scene);
+        let composite_renderer = CompositeRenderer::new(&device, &frame_buffers, &surface);
 
         Ok(Self {
             surface,
