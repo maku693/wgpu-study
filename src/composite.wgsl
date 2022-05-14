@@ -40,7 +40,7 @@ var<private> blur_sample_texel_offsets: array<vec2<f32>, 4> = array<vec2<f32>, 4
   vec2<f32>(-0.5, -0.5),
   vec2<f32>(0.5, -0.5),
   vec2<f32>(-0.5, 0.5),
-  vec2<f32>(0.5, 1.0),
+  vec2<f32>(0.5, 0.5),
 );
 
 @fragment
@@ -49,14 +49,14 @@ fn fs_main(@location(0) tex_coord: vec2<f32>) -> @location(0) vec4<f32> {
   let texel_size = vec2<f32>(1.0) / vec2<f32>(resolution);
 
   var color = vec4<f32>(0.0);
-  for (var i = 0; i < 5; i++) {
+  for (var i = 0; i < 4; i++) {
     color += textureSample(
       color_texture,
       color_sampler,
       tex_coord + blur_sample_texel_offsets[i] * texel_size
     );
   }
-  color *= 0.2;
+  color *= 0.25;
 
   return pow(color * uniforms.exposure, vec4<f32>(2.2));
 }
