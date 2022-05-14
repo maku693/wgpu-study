@@ -36,7 +36,7 @@ var color_texture: texture_2d<f32>;
 @group(0) @binding(2)
 var color_sampler: sampler;
 
-var<private> blur_fetches: array<vec2<f32>, 5> = array<vec2<f32>, 5>(
+var<private> blur_sample_texel_offsets: array<vec2<f32>, 5> = array<vec2<f32>, 5>(
   vec2<f32>(0.5, 0.5),
   vec2<f32>(0.0, 0.0),
   vec2<f32>(1.0, 0.0),
@@ -54,7 +54,7 @@ fn fs_main(@location(0) tex_coord: vec2<f32>) -> @location(0) vec4<f32> {
     color += textureSample(
       color_texture,
       color_sampler,
-      tex_coord + blur_fetches[i] * texel_size
+      tex_coord + blur_sample_texel_offsets[i] * texel_size
     );
   }
   color *= 0.2;
