@@ -2,7 +2,7 @@ use std::mem::size_of;
 
 use bytemuck::{bytes_of, Pod, Zeroable};
 
-use crate::{entity::Scene, frame_buffers::FrameBuffers};
+use crate::{entity::Scene, frame_buffers::FrameBuffers, samplers::Samplers};
 
 #[derive(Debug, Copy, Clone, Default, Pod, Zeroable)]
 #[repr(C)]
@@ -21,7 +21,6 @@ impl BloomUniforms {
 }
 
 pub struct BloomRenderer {
-    bilinear_sampler: wgpu::Sampler,
     bright_uniform_buffer: wgpu::Buffer,
     bright_bind_group: wgpu::BindGroup,
     bright_bind_group_layout: wgpu::BindGroupLayout,
@@ -39,14 +38,7 @@ pub struct BloomRenderer {
 impl BloomRenderer {
     pub const STAGING_BUFFER_CHUNK_SIZE: wgpu::BufferAddress = size_of::<BloomUniforms>() as _;
 
-    pub fn new(device: &wgpu::Device, frame_buffers: &FrameBuffers) -> Self {
-        let bilinear_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            label: Some("Bloom Bilinear Sampler"),
-            mag_filter: wgpu::FilterMode::Linear,
-            min_filter: wgpu::FilterMode::Linear,
-            ..Default::default()
-        });
-
+    pub fn new(device: &wgpu::Device, frame_buffers: &FrameBuffers, samplers: &Samplers) -> Self {
         let vertex_shader_module =
             device.create_shader_module(&wgpu::include_wgsl!("fullscreen_vs.wgsl"));
 
@@ -97,7 +89,7 @@ impl BloomRenderer {
             &bright_bind_group_layout,
             &bright_uniform_buffer,
             &frame_buffers.color_texture_view,
-            &bilinear_sampler,
+            &samplers.bilinear,
         );
 
         let bright_render_pipeline = {
@@ -165,7 +157,7 @@ impl BloomRenderer {
             device,
             &blur_bind_group_layout,
             &frame_buffers.bright_texture_view,
-            &bilinear_sampler,
+            &samplers.bilinear,
         );
 
         let blur_render_pipeline = {
@@ -236,7 +228,7 @@ impl BloomRenderer {
                     device,
                     &composite_bind_group_layout,
                     &buf.texture_view,
-                    &bilinear_sampler,
+                    &samplers.bilinear,
                 )
             })
             .collect::<Vec<_>>();
@@ -281,7 +273,6 @@ impl BloomRenderer {
         };
 
         Self {
-            bilinear_sampler,
             bright_uniform_buffer,
             bright_bind_group_layout,
             bright_bind_group,
@@ -366,19 +357,24 @@ impl BloomRenderer {
         })
     }
 
-    pub fn recreate_bind_group(&mut self, device: &wgpu::Device, frame_buffers: &FrameBuffers) {
+    pub fn recreate_bind_group(
+        &mut self,
+        device: &wgpu::Device,
+        frame_buffers: &FrameBuffers,
+        samplers: &Samplers,
+    ) {
         self.bright_bind_group = Self::create_bright_bind_group(
             device,
             &self.bright_bind_group_layout,
             &self.bright_uniform_buffer,
             &frame_buffers.color_texture_view,
-            &self.bilinear_sampler,
+            &samplers.bilinear,
         );
         self.blur_bind_group = Self::create_blur_bind_group(
             device,
             &self.blur_bind_group_layout,
             &frame_buffers.bright_texture_view,
-            &self.bilinear_sampler,
+            &samplers.bilinear,
         );
         self.composite_bind_groups = (&frame_buffers.bloom_blur_buffers)
             .into_iter()
@@ -387,7 +383,7 @@ impl BloomRenderer {
                     device,
                     &self.composite_bind_group_layout,
                     &buf.texture_view,
-                    &self.bilinear_sampler,
+                    &samplers.bilinear,
                 )
             })
             .collect::<Vec<_>>()

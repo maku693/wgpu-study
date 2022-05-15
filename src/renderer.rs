@@ -66,7 +66,7 @@ impl Renderer {
         let samplers = Samplers::new(&device);
 
         let particle_renderer = ParticleRenderer::new(&device, scene);
-        let bloom_renderer = BloomRenderer::new(&device, &frame_buffers);
+        let bloom_renderer = BloomRenderer::new(&device, &frame_buffers, &samplers);
         let composite_renderer =
             CompositeRenderer::new(&device, &samplers, &frame_buffers, &surface);
 
@@ -89,7 +89,7 @@ impl Renderer {
         self.frame_buffers.resize(&self.device, width, height);
 
         self.bloom_renderer
-            .recreate_bind_group(&self.device, &self.frame_buffers);
+            .recreate_bind_group(&self.device, &self.frame_buffers, &self.samplers);
         self.composite_renderer.recreate_bind_group(
             &self.device,
             &self.frame_buffers,
