@@ -6,12 +6,12 @@ use crate::{entity::Scene, frame_buffers::FrameBuffers, samplers::Samplers};
 
 #[derive(Debug, Copy, Clone, Default, Pod, Zeroable)]
 #[repr(C)]
-struct BloomUniforms {
+struct BrightUniforms {
     intensity: f32,
     threshold: f32,
 }
 
-impl BloomUniforms {
+impl BrightUniforms {
     fn new(scene: &Scene) -> Self {
         Self {
             intensity: scene.bloom_effect.intensity,
@@ -33,7 +33,7 @@ pub struct BloomRenderer {
 }
 
 impl BloomRenderer {
-    pub const STAGING_BUFFER_CHUNK_SIZE: wgpu::BufferAddress = size_of::<BloomUniforms>() as _;
+    pub const STAGING_BUFFER_CHUNK_SIZE: wgpu::BufferAddress = size_of::<BrightUniforms>() as _;
 
     pub fn new(device: &wgpu::Device, frame_buffers: &FrameBuffers, samplers: &Samplers) -> Self {
         let vertex_shader_module =
@@ -329,7 +329,7 @@ impl BrightPass {
 
         let bright_uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Bloom Uniform Buffer"),
-            size: size_of::<BloomUniforms>() as _,
+            size: size_of::<BrightUniforms>() as _,
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
@@ -345,7 +345,7 @@ impl BrightPass {
                             ty: wgpu::BufferBindingType::Uniform,
                             has_dynamic_offset: false,
                             min_binding_size: wgpu::BufferSize::new(
-                                size_of::<BloomUniforms>() as _
+                                size_of::<BrightUniforms>() as _
                             ),
                         },
                         count: None,
@@ -472,13 +472,13 @@ impl BrightPass {
         encoder: &mut wgpu::CommandEncoder,
         scene: &Scene,
     ) {
-        let bloom_uniforms = BloomUniforms::new(&scene);
+        let bloom_uniforms = BrightUniforms::new(&scene);
         staging_belt
             .write_buffer(
                 encoder,
                 &self.bright_uniform_buffer,
                 0,
-                wgpu::BufferSize::new(size_of::<BloomUniforms>() as _).unwrap(),
+                wgpu::BufferSize::new(size_of::<BrightUniforms>() as _).unwrap(),
                 device,
             )
             .copy_from_slice(bytes_of(&bloom_uniforms));
