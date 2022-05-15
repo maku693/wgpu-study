@@ -50,6 +50,7 @@ impl Renderer {
 
         let staging_belt = wgpu::util::StagingBelt::new(
             ParticleRenderer::STAGING_BUFFER_CHUNK_SIZE
+                + BloomRenderer::STAGING_BUFFER_CHUNK_SIZE
                 + CompositeRenderer::STAGING_BUFFER_CHUNK_SIZE,
         );
 

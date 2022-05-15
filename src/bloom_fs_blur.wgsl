@@ -25,6 +25,5 @@ fn main(@location(0) tex_coord: vec2<f32>) -> @location(0) vec4<f32> {
   }
   color *= 0.25;
 
-  var color = vec4<f32>(1.0, 1.0, 1.0, 1.0);
   return color;
 }

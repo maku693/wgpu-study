@@ -23,20 +23,12 @@ pub struct CompositeRenderer {
     bind_group_layout: wgpu::BindGroupLayout,
     bind_group: wgpu::BindGroup,
     render_pipeline: wgpu::RenderPipeline,
-    sampler: wgpu::Sampler,
 }
 
 impl CompositeRenderer {
     pub const STAGING_BUFFER_CHUNK_SIZE: wgpu::BufferAddress = size_of::<CompositeUniforms>() as _;
 
     pub fn new(device: &wgpu::Device, frame_buffers: &FrameBuffers, surface: &Surface) -> Self {
-        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            label: Some("Sampler"),
-            mag_filter: wgpu::FilterMode::Linear,
-            min_filter: wgpu::FilterMode::Linear,
-            ..Default::default()
-        });
-
         let uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Composite pass uniform buffer"),
             size: size_of::<CompositeUniforms>() as _,
@@ -64,16 +56,10 @@ impl CompositeRenderer {
                         binding: 1,
                         visibility: wgpu::ShaderStages::FRAGMENT,
                         ty: wgpu::BindingType::Texture {
-                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                            sample_type: wgpu::TextureSampleType::Float { filterable: false },
                             view_dimension: wgpu::TextureViewDimension::D2,
                             multisampled: false,
                         },
-                        count: None,
-                    },
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 2,
-                        visibility: wgpu::ShaderStages::FRAGMENT,
-                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                         count: None,
                     },
                 ],
@@ -84,7 +70,6 @@ impl CompositeRenderer {
             &bind_group_layout,
             &uniform_buffer,
             &frame_buffers.color_texture_view,
-            &sampler,
         );
 
         let render_pipeline = {
@@ -129,7 +114,6 @@ impl CompositeRenderer {
             bind_group_layout,
             bind_group,
             render_pipeline,
-            sampler,
         }
     }
 
@@ -138,7 +122,6 @@ impl CompositeRenderer {
         layout: &wgpu::BindGroupLayout,
         uniform_buffer: &wgpu::Buffer,
         color_texture_view: &wgpu::TextureView,
-        sampler: &wgpu::Sampler,
     ) -> wgpu::BindGroup {
         device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: None,
@@ -152,10 +135,6 @@ impl CompositeRenderer {
                     binding: 1,
                     resource: wgpu::BindingResource::TextureView(color_texture_view),
                 },
-                wgpu::BindGroupEntry {
-                    binding: 2,
-                    resource: wgpu::BindingResource::Sampler(sampler),
-                },
             ],
         })
     }
@@ -166,7 +145,6 @@ impl CompositeRenderer {
             &self.bind_group_layout,
             &self.uniform_buffer,
             &frame_buffers.color_texture_view,
-            &self.sampler,
         );
     }
 
@@ -196,7 +174,7 @@ impl CompositeRenderer {
         surface_texture_view: &wgpu::TextureView,
     ) {
         let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: None,
+            label: Some("Composite Render Pass"),
             color_attachments: &[wgpu::RenderPassColorAttachment {
                 view: surface_texture_view,
                 resolve_target: None,

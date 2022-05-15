@@ -91,7 +91,7 @@ impl BloomRenderer {
             &device,
             &bright_bind_group_layout,
             &bright_uniform_buffer,
-            &frame_buffers.bloom_texture_view,
+            &frame_buffers.bright_texture_view,
             &bilinear_sampler,
         );
 
@@ -159,7 +159,7 @@ impl BloomRenderer {
         let blur_bind_group = Self::create_blur_bind_group(
             device,
             &blur_bind_group_layout,
-            &frame_buffers.bloom_texture_view,
+            &frame_buffers.bright_texture_view,
             &bilinear_sampler,
         );
 
@@ -273,7 +273,7 @@ impl BloomRenderer {
         self.blur_bind_group = Self::create_blur_bind_group(
             device,
             &self.blur_bind_group_layout,
-            &frame_buffers.bloom_texture_view,
+            &frame_buffers.bright_texture_view,
             &self.bilinear_sampler,
         );
     }
@@ -298,20 +298,39 @@ impl BloomRenderer {
     }
 
     pub fn draw(&self, encoder: &mut wgpu::CommandEncoder, frame_buffers: &FrameBuffers) {
-        let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("Bloom Render Pass"),
-            color_attachments: &[wgpu::RenderPassColorAttachment {
-                view: &frame_buffers.bloom_texture_view,
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                    store: true,
-                },
-            }],
-            depth_stencil_attachment: None,
-        });
-        rpass.set_bind_group(0, &self.bright_bind_group, &[]);
-        rpass.set_pipeline(&self.bright_render_pipeline);
-        rpass.draw(0..3, 0..1);
+        {
+            let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Bloom Bright Render Pass"),
+                color_attachments: &[wgpu::RenderPassColorAttachment {
+                    view: &frame_buffers.bright_texture_view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                        store: true,
+                    },
+                }],
+                depth_stencil_attachment: None,
+            });
+            rpass.set_bind_group(0, &self.bright_bind_group, &[]);
+            rpass.set_pipeline(&self.bright_render_pipeline);
+            rpass.draw(0..3, 0..1);
+        }
+        {
+            let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Bloom Blur Render Pass"),
+                color_attachments: &[wgpu::RenderPassColorAttachment {
+                    view: &frame_buffers.bloom_texture_view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                        store: true,
+                    },
+                }],
+                depth_stencil_attachment: None,
+            });
+            rpass.set_bind_group(0, &self.blur_bind_group, &[]);
+            rpass.set_pipeline(&self.blur_render_pipeline);
+            rpass.draw(0..3, 0..1);
+        }
     }
 }
