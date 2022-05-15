@@ -91,7 +91,7 @@ impl BloomRenderer {
             &device,
             &bright_bind_group_layout,
             &bright_uniform_buffer,
-            &frame_buffers.bright_texture_view,
+            &frame_buffers.color_texture_view,
             &bilinear_sampler,
         );
 
