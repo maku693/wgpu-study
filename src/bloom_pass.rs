@@ -24,8 +24,6 @@ pub struct BloomRenderer {
     bright_pass: BrightPass,
     blur_pass: BlurPass,
     composite_pass: CompositePass,
-    // TODO: make bind group layout initialized lazily
-    // TODO: separate each pass
 }
 
 impl BloomRenderer {
