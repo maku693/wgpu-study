@@ -7,41 +7,13 @@ pub struct FrameBuffer {
 }
 
 impl FrameBuffer {
-    fn new_bloom_blur(device: &wgpu::Device, width: u32, height: u32) -> Self {
+    fn new_hdr_color(device: &wgpu::Device, width: u32, height: u32) -> Self {
         let format = wgpu::TextureFormat::Rgba16Float;
         let texture = device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("Bloom Blur Texture"),
+            label: Some("HDR Color Texture"),
             size: wgpu::Extent3d {
-                // TODO: do not divide width and height here
-                width: width / 4,
-                height: height / 4,
-                depth_or_array_layers: 1,
-            },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format,
-            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::RENDER_ATTACHMENT,
-        });
-        let texture_view = texture.create_view(&wgpu::TextureViewDescriptor {
-            ..Default::default()
-        });
-
-        Self {
-            texture,
-            texture_view,
-            format,
-        }
-    }
-
-    fn new_bloom(device: &wgpu::Device, width: u32, height: u32) -> Self {
-        let format = wgpu::TextureFormat::Rgba16Float;
-        let texture = device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("Bloom Texture"),
-            size: wgpu::Extent3d {
-                // TODO: do not divide width and height here
-                width: width / 4,
-                height: height / 4,
+                width,
+                height,
                 depth_or_array_layers: 1,
             },
             mip_level_count: 1,
@@ -63,16 +35,14 @@ impl FrameBuffer {
 }
 
 pub struct FrameBuffers {
+    // TODO: migrate all to FrameBuffer struct
     pub color_texture: wgpu::Texture,
     pub color_texture_view: wgpu::TextureView,
     pub depth_texture: wgpu::Texture,
     pub depth_texture_view: wgpu::TextureView,
     pub bright_texture: wgpu::Texture,
     pub bright_texture_view: wgpu::TextureView,
-    pub bloom_texture: wgpu::Texture,
-    pub bloom_texture_view: wgpu::TextureView,
     pub bloom_blur_buffers: Vec<FrameBuffer>,
-    pub bloom_buffer: FrameBuffer,
 }
 
 impl FrameBuffers {
@@ -90,18 +60,7 @@ impl FrameBuffers {
         let bright_texture = Self::create_bright_texture(device, width, height);
         let bright_texture_view = Self::create_bright_texture_view(&bright_texture);
 
-        let bloom_texture = Self::create_bloom_texture(device, width, height);
-        let bloom_texture_view = Self::create_bloom_texture_view(&bloom_texture, 0);
-
-        let bloom_blur_buffers = (0..4) // TODO: set number of buffers dynamically
-            .map(|i| {
-                let width = width / 2 / (i + 1);
-                let height = height / 2 / (i + 1);
-                FrameBuffer::new_bloom_blur(device, width, height)
-            })
-            .collect::<Vec<_>>();
-
-        let bloom_buffer = FrameBuffer::new_bloom(device, width, height);
+        let bloom_blur_buffers = Self::create_bloom_blur_buffers(device, width, height);
 
         Self {
             color_texture,
@@ -110,10 +69,7 @@ impl FrameBuffers {
             depth_texture_view,
             bright_texture,
             bright_texture_view,
-            bloom_texture,
-            bloom_texture_view,
             bloom_blur_buffers,
-            bloom_buffer,
         }
     }
 
@@ -166,6 +122,7 @@ impl FrameBuffers {
         device.create_texture(&wgpu::TextureDescriptor {
             label: Some("Bloom Bright Texture"),
             size: wgpu::Extent3d {
+                // TODO: do not set resolution here
                 width: width / 4,
                 height: height / 4,
                 depth_or_array_layers: 1,
@@ -184,29 +141,16 @@ impl FrameBuffers {
         })
     }
 
-    fn create_bloom_texture(device: &wgpu::Device, width: u32, height: u32) -> wgpu::Texture {
-        device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("Bloom Texture"),
-            size: wgpu::Extent3d {
-                width: width / 4,
-                height: height / 4,
-                depth_or_array_layers: 4,
-            },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: Self::BLOOM_FORMAT,
-            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::RENDER_ATTACHMENT,
-        })
-    }
-
-    fn create_bloom_texture_view(texture: &wgpu::Texture, base_layer: u32) -> wgpu::TextureView {
-        texture.create_view(&wgpu::TextureViewDescriptor {
-            dimension: Some(wgpu::TextureViewDimension::D2),
-            base_array_layer: base_layer,
-            array_layer_count: NonZeroU32::new(1),
-            ..Default::default()
-        })
+    fn create_bloom_blur_buffers(
+        device: &wgpu::Device,
+        base_width: u32,
+        base_height: u32,
+    ) -> Vec<FrameBuffer> {
+        let width = base_width / 4;
+        let height = base_height / 4;
+        (0..3)
+            .map(|_| FrameBuffer::new_hdr_color(device, width, height))
+            .collect::<Vec<_>>()
     }
 
     pub fn resize(&mut self, device: &wgpu::Device, width: u32, height: u32) {
@@ -216,8 +160,6 @@ impl FrameBuffers {
         self.depth_texture_view = Self::create_depth_texture_view(&self.depth_texture);
         self.bright_texture = Self::create_bright_texture(device, width, height);
         self.bright_texture_view = Self::create_bright_texture_view(&self.bright_texture);
-        self.bloom_texture = Self::create_bloom_texture(device, width, height);
-        self.bloom_texture_view = Self::create_bloom_texture_view(&self.bloom_texture, 0);
-        // TODO: resize bloom framebuffers
+        self.bloom_blur_buffers = Self::create_bloom_blur_buffers(device, width, height);
     }
 }

@@ -12,7 +12,7 @@ var r_sampler: sampler;
 
 @fragment
 fn main(@location(0) tex_coord: vec2<f32>) -> @location(0) vec4<f32> {
-  let resolution = textureDimensions(r_texture) / vec2<u32>(2);
+  let resolution = textureDimensions(r_texture);
   let texel_size = vec2<f32>(1.0) / vec2<f32>(resolution);
 
   var color = vec4<f32>(0.0);
