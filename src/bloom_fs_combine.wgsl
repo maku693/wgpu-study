@@ -1,10 +1,12 @@
 @group(0) @binding(0)
-var texture: texture_2d_array<f32>;
+var r_texture: texture_2d<f32>;
 @group(0) @binding(1)
-var sampler: sampler;
+var r_sampler: sampler;
 
 @fragment
 fn main(@location(0) tex_coord: vec2<f32>) -> @location(0) vec4<f32> {
-  var color = vec4<f32>(1.0, 1.0, 1.0, 1.0);
+  var color = textureSample(r_texture, r_sampler, tex_coord);
   return color;
 }
+
+// TODO: Make the file name of this shader more general
