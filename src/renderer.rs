@@ -4,8 +4,8 @@ use anyhow::{Context, Ok, Result};
 use winit::{dpi::PhysicalSize, window::Window};
 
 use crate::{
-    composite_pass::CompositeRenderer, entity::Scene, frame_buffers::FrameBuffers,
-    particle_pass::ParticleRenderer, surface::Surface,
+    bloom_pass::BloomRenderer, composite_pass::CompositeRenderer, entity::Scene,
+    frame_buffers::FrameBuffers, particle_pass::ParticleRenderer, surface::Surface,
 };
 
 pub struct Renderer {
@@ -15,6 +15,7 @@ pub struct Renderer {
     staging_belt: wgpu::util::StagingBelt,
     frame_buffers: FrameBuffers,
     particle_renderer: ParticleRenderer,
+    bloom_renderer: BloomRenderer,
     composite_renderer: CompositeRenderer,
 }
 
@@ -60,6 +61,7 @@ impl Renderer {
         let frame_buffers = FrameBuffers::new(&device, width, height);
 
         let particle_renderer = ParticleRenderer::new(&device, scene);
+        let bloom_renderer = BloomRenderer::new(&device, &frame_buffers);
         let composite_renderer = CompositeRenderer::new(&device, &frame_buffers, &surface);
 
         Ok(Self {
@@ -69,6 +71,7 @@ impl Renderer {
             staging_belt,
             frame_buffers,
             particle_renderer,
+            bloom_renderer,
             composite_renderer,
         })
     }
@@ -78,6 +81,8 @@ impl Renderer {
 
         self.frame_buffers.resize(&self.device, width, height);
 
+        self.bloom_renderer
+            .recreate_bind_group(&self.device, &self.frame_buffers);
         self.composite_renderer
             .recreate_bind_group(&self.device, &self.frame_buffers);
     }
@@ -95,6 +100,8 @@ impl Renderer {
 
         self.particle_renderer
             .update(&self.device, &mut self.staging_belt, &mut encoder, scene);
+        self.bloom_renderer
+            .update(&self.device, &mut self.staging_belt, &mut encoder, scene);
         self.composite_renderer
             .update(&self.device, &mut self.staging_belt, &mut encoder, scene);
 
@@ -102,6 +109,9 @@ impl Renderer {
 
         self.particle_renderer
             .draw(&mut encoder, &self.frame_buffers);
+
+        self.bloom_renderer.draw(&mut encoder, &self.frame_buffers);
+
         self.composite_renderer
             .draw(&mut encoder, &surface_texture_view);
 
