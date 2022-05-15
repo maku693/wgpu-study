@@ -17,6 +17,7 @@ mod entity;
 mod frame_buffers;
 mod particle_pass;
 mod renderer;
+mod samplers;
 mod surface;
 
 fn main() -> Result<()> {

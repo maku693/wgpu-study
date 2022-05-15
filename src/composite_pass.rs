@@ -2,7 +2,7 @@ use std::mem::size_of;
 
 use bytemuck::{bytes_of, Pod, Zeroable};
 
-use crate::{entity::Scene, frame_buffers::FrameBuffers, surface::Surface};
+use crate::{entity::Scene, frame_buffers::FrameBuffers, samplers::Samplers, surface::Surface};
 
 #[derive(Debug, Copy, Clone, Default, Pod, Zeroable)]
 #[repr(C)]
@@ -19,7 +19,6 @@ impl CompositeUniforms {
 }
 
 pub struct CompositeRenderer {
-    bilinear_sampler: wgpu::Sampler,
     uniform_buffer: wgpu::Buffer,
     bind_group_layout: wgpu::BindGroupLayout,
     bind_group: wgpu::BindGroup,
@@ -29,14 +28,12 @@ pub struct CompositeRenderer {
 impl CompositeRenderer {
     pub const STAGING_BUFFER_CHUNK_SIZE: wgpu::BufferAddress = size_of::<CompositeUniforms>() as _;
 
-    pub fn new(device: &wgpu::Device, frame_buffers: &FrameBuffers, surface: &Surface) -> Self {
-        let bilinear_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            label: Some("Bloom Bilinear Sampler"),
-            mag_filter: wgpu::FilterMode::Linear,
-            min_filter: wgpu::FilterMode::Linear,
-            ..Default::default()
-        });
-
+    pub fn new(
+        device: &wgpu::Device,
+        samplers: &Samplers,
+        frame_buffers: &FrameBuffers,
+        surface: &Surface,
+    ) -> Self {
         let uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Composite pass uniform buffer"),
             size: size_of::<CompositeUniforms>() as _,
@@ -90,11 +87,11 @@ impl CompositeRenderer {
             });
 
         let bind_group = Self::create_bind_group(
-            &device,
+            device,
             &bind_group_layout,
             &uniform_buffer,
             frame_buffers,
-            &bilinear_sampler,
+            samplers,
         );
 
         let render_pipeline = {
@@ -135,7 +132,6 @@ impl CompositeRenderer {
         };
 
         Self {
-            bilinear_sampler,
             uniform_buffer,
             bind_group_layout,
             bind_group,
@@ -148,7 +144,7 @@ impl CompositeRenderer {
         layout: &wgpu::BindGroupLayout,
         uniform_buffer: &wgpu::Buffer,
         frame_buffers: &FrameBuffers,
-        bilinear_sampler: &wgpu::Sampler,
+        samplers: &Samplers,
     ) -> wgpu::BindGroup {
         device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: None,
@@ -170,19 +166,24 @@ impl CompositeRenderer {
                 },
                 wgpu::BindGroupEntry {
                     binding: 3,
-                    resource: wgpu::BindingResource::Sampler(bilinear_sampler),
+                    resource: wgpu::BindingResource::Sampler(&samplers.bilinear),
                 },
             ],
         })
     }
 
-    pub fn recreate_bind_group(&mut self, device: &wgpu::Device, frame_buffers: &FrameBuffers) {
+    pub fn recreate_bind_group(
+        &mut self,
+        device: &wgpu::Device,
+        frame_buffers: &FrameBuffers,
+        samplers: &Samplers,
+    ) {
         self.bind_group = Self::create_bind_group(
             device,
             &self.bind_group_layout,
             &self.uniform_buffer,
-            &frame_buffers,
-            &self.bilinear_sampler,
+            frame_buffers,
+            samplers,
         );
     }
 

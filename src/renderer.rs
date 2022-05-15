@@ -5,7 +5,8 @@ use winit::{dpi::PhysicalSize, window::Window};
 
 use crate::{
     bloom_pass::BloomRenderer, composite_pass::CompositeRenderer, entity::Scene,
-    frame_buffers::FrameBuffers, particle_pass::ParticleRenderer, surface::Surface,
+    frame_buffers::FrameBuffers, particle_pass::ParticleRenderer, samplers::Samplers,
+    surface::Surface,
 };
 
 pub struct Renderer {
@@ -14,6 +15,7 @@ pub struct Renderer {
     queue: wgpu::Queue,
     staging_belt: wgpu::util::StagingBelt,
     frame_buffers: FrameBuffers,
+    samplers: Samplers,
     particle_renderer: ParticleRenderer,
     bloom_renderer: BloomRenderer,
     composite_renderer: CompositeRenderer,
@@ -61,9 +63,12 @@ impl Renderer {
 
         let frame_buffers = FrameBuffers::new(&device, width, height);
 
+        let samplers = Samplers::new(&device);
+
         let particle_renderer = ParticleRenderer::new(&device, scene);
         let bloom_renderer = BloomRenderer::new(&device, &frame_buffers);
-        let composite_renderer = CompositeRenderer::new(&device, &frame_buffers, &surface);
+        let composite_renderer =
+            CompositeRenderer::new(&device, &samplers, &frame_buffers, &surface);
 
         Ok(Self {
             surface,
@@ -71,6 +76,7 @@ impl Renderer {
             queue,
             staging_belt,
             frame_buffers,
+            samplers,
             particle_renderer,
             bloom_renderer,
             composite_renderer,
@@ -84,8 +90,11 @@ impl Renderer {
 
         self.bloom_renderer
             .recreate_bind_group(&self.device, &self.frame_buffers);
-        self.composite_renderer
-            .recreate_bind_group(&self.device, &self.frame_buffers);
+        self.composite_renderer.recreate_bind_group(
+            &self.device,
+            &self.frame_buffers,
+            &self.samplers,
+        );
     }
 
     pub fn render(&mut self, scene: &Scene) -> impl Future<Output = ()> {
