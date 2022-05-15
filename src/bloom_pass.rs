@@ -4,22 +4,6 @@ use bytemuck::{bytes_of, Pod, Zeroable};
 
 use crate::{entity::Scene, frame_buffers::FrameBuffers, samplers::Samplers};
 
-#[derive(Debug, Copy, Clone, Default, Pod, Zeroable)]
-#[repr(C)]
-struct BrightUniforms {
-    intensity: f32,
-    threshold: f32,
-}
-
-impl BrightUniforms {
-    fn new(scene: &Scene) -> Self {
-        Self {
-            intensity: scene.bloom_effect.intensity,
-            threshold: scene.bloom_effect.threshold,
-        }
-    }
-}
-
 pub struct BloomRenderer {
     bright_pass: BrightPass,
     blur_pass: BlurPass,
@@ -70,6 +54,22 @@ impl BloomRenderer {
         self.bright_pass.draw(encoder, frame_buffers);
         self.blur_pass.draw(encoder, frame_buffers);
         self.composite_pass.draw(encoder, frame_buffers);
+    }
+}
+
+#[derive(Debug, Copy, Clone, Default, Pod, Zeroable)]
+#[repr(C)]
+struct BrightUniforms {
+    intensity: f32,
+    threshold: f32,
+}
+
+impl BrightUniforms {
+    fn new(scene: &Scene) -> Self {
+        Self {
+            intensity: scene.bloom_effect.intensity,
+            threshold: scene.bloom_effect.threshold,
+        }
     }
 }
 
