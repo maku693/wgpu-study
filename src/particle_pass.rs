@@ -123,7 +123,7 @@ impl ParticleRenderer {
                                 rng.gen_range(0.0..1.0),
                             );
                             v = v.normalize();
-                            v *= 2.0;
+                            v *= 10.0;
 
                             (v, 1.0).into()
                         };

@@ -1,3 +1,5 @@
+use std::num::NonZeroU32;
+
 pub struct FrameBuffers {
     pub color_texture: wgpu::Texture,
     pub color_texture_view: wgpu::TextureView,
@@ -25,7 +27,7 @@ impl FrameBuffers {
         let bright_texture_view = Self::create_bright_texture_view(&bright_texture);
 
         let bloom_texture = Self::create_bloom_texture(device, width, height);
-        let bloom_texture_view = Self::create_bloom_texture_view(&bloom_texture);
+        let bloom_texture_view = Self::create_bloom_texture_view(&bloom_texture, 0);
 
         Self {
             color_texture,
@@ -88,8 +90,8 @@ impl FrameBuffers {
         device.create_texture(&wgpu::TextureDescriptor {
             label: Some("Bloom Bright Texture"),
             size: wgpu::Extent3d {
-                width: width / 8,
-                height: height / 8,
+                width: width / 4,
+                height: height / 4,
                 depth_or_array_layers: 1,
             },
             mip_level_count: 1,
@@ -110,9 +112,9 @@ impl FrameBuffers {
         device.create_texture(&wgpu::TextureDescriptor {
             label: Some("Bloom Texture"),
             size: wgpu::Extent3d {
-                width: width / 8,
-                height: height / 8,
-                depth_or_array_layers: 1,
+                width: width / 4,
+                height: height / 4,
+                depth_or_array_layers: 4,
             },
             mip_level_count: 1,
             sample_count: 1,
@@ -122,8 +124,11 @@ impl FrameBuffers {
         })
     }
 
-    fn create_bloom_texture_view(texture: &wgpu::Texture) -> wgpu::TextureView {
+    fn create_bloom_texture_view(texture: &wgpu::Texture, base_layer: u32) -> wgpu::TextureView {
         texture.create_view(&wgpu::TextureViewDescriptor {
+            dimension: Some(wgpu::TextureViewDimension::D2),
+            base_array_layer: base_layer,
+            array_layer_count: NonZeroU32::new(1),
             ..Default::default()
         })
     }
@@ -136,6 +141,6 @@ impl FrameBuffers {
         self.bright_texture = Self::create_bright_texture(device, width, height);
         self.bright_texture_view = Self::create_bright_texture_view(&self.bright_texture);
         self.bloom_texture = Self::create_bloom_texture(device, width, height);
-        self.bloom_texture_view = Self::create_bloom_texture_view(&self.bloom_texture);
+        self.bloom_texture_view = Self::create_bloom_texture_view(&self.bloom_texture, 0);
     }
 }
