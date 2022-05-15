@@ -8,5 +8,3 @@ fn main(@location(0) tex_coord: vec2<f32>) -> @location(0) vec4<f32> {
   var color = textureSample(r_texture, r_sampler, tex_coord);
   return color;
 }
-
-// TODO: Make the file name of this shader more general

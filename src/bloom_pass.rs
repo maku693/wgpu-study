@@ -249,7 +249,7 @@ impl BloomRenderer {
             });
 
             let fragment_shader_module =
-                device.create_shader_module(&wgpu::include_wgsl!("bloom_fs_combine.wgsl"));
+                device.create_shader_module(&wgpu::include_wgsl!("draw_texture_fs.wgsl"));
 
             device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
                 label: None,
