@@ -19,6 +19,7 @@ impl CompositeUniforms {
 }
 
 pub struct CompositeRenderer {
+    bilinear_sampler: wgpu::Sampler,
     uniform_buffer: wgpu::Buffer,
     bind_group_layout: wgpu::BindGroupLayout,
     bind_group: wgpu::BindGroup,
@@ -29,6 +30,13 @@ impl CompositeRenderer {
     pub const STAGING_BUFFER_CHUNK_SIZE: wgpu::BufferAddress = size_of::<CompositeUniforms>() as _;
 
     pub fn new(device: &wgpu::Device, frame_buffers: &FrameBuffers, surface: &Surface) -> Self {
+        let bilinear_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("Bloom Bilinear Sampler"),
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            ..Default::default()
+        });
+
         let uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Composite pass uniform buffer"),
             size: size_of::<CompositeUniforms>() as _,
@@ -62,6 +70,22 @@ impl CompositeRenderer {
                         },
                         count: None,
                     },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 2,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            multisampled: false,
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 3,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                        count: None,
+                    },
                 ],
             });
 
@@ -69,7 +93,8 @@ impl CompositeRenderer {
             &device,
             &bind_group_layout,
             &uniform_buffer,
-            &frame_buffers.color_texture_view,
+            frame_buffers,
+            &bilinear_sampler,
         );
 
         let render_pipeline = {
@@ -110,6 +135,7 @@ impl CompositeRenderer {
         };
 
         Self {
+            bilinear_sampler,
             uniform_buffer,
             bind_group_layout,
             bind_group,
@@ -121,7 +147,8 @@ impl CompositeRenderer {
         device: &wgpu::Device,
         layout: &wgpu::BindGroupLayout,
         uniform_buffer: &wgpu::Buffer,
-        color_texture_view: &wgpu::TextureView,
+        frame_buffers: &FrameBuffers,
+        bilinear_sampler: &wgpu::Sampler,
     ) -> wgpu::BindGroup {
         device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: None,
@@ -133,7 +160,15 @@ impl CompositeRenderer {
                 },
                 wgpu::BindGroupEntry {
                     binding: 1,
-                    resource: wgpu::BindingResource::TextureView(color_texture_view),
+                    resource: wgpu::BindingResource::TextureView(&frame_buffers.color_texture_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::TextureView(&frame_buffers.bloom_texture_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: wgpu::BindingResource::Sampler(bilinear_sampler),
                 },
             ],
         })
@@ -144,7 +179,8 @@ impl CompositeRenderer {
             device,
             &self.bind_group_layout,
             &self.uniform_buffer,
-            &frame_buffers.color_texture_view,
+            &frame_buffers,
+            &self.bilinear_sampler,
         );
     }
 

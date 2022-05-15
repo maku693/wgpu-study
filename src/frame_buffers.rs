@@ -86,10 +86,10 @@ impl FrameBuffers {
 
     fn create_bright_texture(device: &wgpu::Device, width: u32, height: u32) -> wgpu::Texture {
         device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("Bloom Texture"),
+            label: Some("Bloom Bright Texture"),
             size: wgpu::Extent3d {
-                width: width / 4,
-                height: height / 4,
+                width: width / 8,
+                height: height / 8,
                 depth_or_array_layers: 1,
             },
             mip_level_count: 1,
@@ -110,8 +110,8 @@ impl FrameBuffers {
         device.create_texture(&wgpu::TextureDescriptor {
             label: Some("Bloom Texture"),
             size: wgpu::Extent3d {
-                width: width / 4,
-                height: height / 4,
+                width: width / 8,
+                height: height / 8,
                 depth_or_array_layers: 1,
             },
             mip_level_count: 1,
