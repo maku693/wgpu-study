@@ -164,7 +164,9 @@ impl CompositeRenderer {
                 },
                 wgpu::BindGroupEntry {
                     binding: 2,
-                    resource: wgpu::BindingResource::TextureView(&frame_buffers.bloom_texture_view),
+                    resource: wgpu::BindingResource::TextureView(
+                        &frame_buffers.bloom_textures[0].texture_view,
+                    ),
                 },
                 wgpu::BindGroupEntry {
                     binding: 3,

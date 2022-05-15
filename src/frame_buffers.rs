@@ -1,5 +1,36 @@
 use std::num::NonZeroU32;
 
+pub struct FrameBuffer {
+    pub texture: wgpu::Texture,
+    pub texture_view: wgpu::TextureView,
+}
+
+pub const BLOOM_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba16Float;
+
+fn create_bloom_frame_buffer(device: &wgpu::Device, width: u32, height: u32) -> FrameBuffer {
+    let texture = device.create_texture(&wgpu::TextureDescriptor {
+        label: Some("Bloom Texture"),
+        size: wgpu::Extent3d {
+            width: width / 4,
+            height: height / 4,
+            depth_or_array_layers: 1,
+        },
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: BLOOM_FORMAT,
+        usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::RENDER_ATTACHMENT,
+    });
+    let texture_view = texture.create_view(&wgpu::TextureViewDescriptor {
+        ..Default::default()
+    });
+
+    FrameBuffer {
+        texture,
+        texture_view,
+    }
+}
+
 pub struct FrameBuffers {
     pub color_texture: wgpu::Texture,
     pub color_texture_view: wgpu::TextureView,
@@ -9,6 +40,7 @@ pub struct FrameBuffers {
     pub bright_texture_view: wgpu::TextureView,
     pub bloom_texture: wgpu::Texture,
     pub bloom_texture_view: wgpu::TextureView,
+    pub bloom_textures: Vec<FrameBuffer>,
 }
 
 impl FrameBuffers {
@@ -29,6 +61,10 @@ impl FrameBuffers {
         let bloom_texture = Self::create_bloom_texture(device, width, height);
         let bloom_texture_view = Self::create_bloom_texture_view(&bloom_texture, 0);
 
+        let bloom_textures = (0..1)
+            .map(|i| create_bloom_frame_buffer(device, width, height))
+            .collect::<Vec<_>>();
+
         Self {
             color_texture,
             color_texture_view,
@@ -38,6 +74,7 @@ impl FrameBuffers {
             bright_texture_view,
             bloom_texture,
             bloom_texture_view,
+            bloom_textures,
         }
     }
 

@@ -319,7 +319,7 @@ impl BloomRenderer {
             let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Bloom Blur Render Pass"),
                 color_attachments: &[wgpu::RenderPassColorAttachment {
-                    view: &frame_buffers.bloom_texture_view,
+                    view: &frame_buffers.bloom_textures[0].texture_view,
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
