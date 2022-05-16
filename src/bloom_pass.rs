@@ -6,6 +6,7 @@ use crate::{entity::Scene, frame_buffers::FrameBuffers, samplers::Samplers};
 
 pub struct BloomRenderer {
     bright_pass: BrightPass,
+    downscale: DownScale,
     blur_pass: BlurPass,
 }
 
@@ -14,10 +15,12 @@ impl BloomRenderer {
 
     pub fn new(device: &wgpu::Device, frame_buffers: &FrameBuffers, samplers: &Samplers) -> Self {
         let bright_pass = BrightPass::new(device, frame_buffers, samplers);
+        let downscale = DownScale::new(device, frame_buffers, samplers);
         let blur_pass = BlurPass::new(device, frame_buffers, samplers);
 
         Self {
             bright_pass,
+            downscale,
             blur_pass,
         }
     }
@@ -29,6 +32,8 @@ impl BloomRenderer {
         samplers: &Samplers,
     ) {
         self.bright_pass
+            .recreate_bind_group(device, frame_buffers, samplers);
+        self.downscale
             .recreate_bind_group(device, frame_buffers, samplers);
         self.blur_pass
             .recreate_bind_group(device, frame_buffers, samplers);
@@ -47,6 +52,7 @@ impl BloomRenderer {
 
     pub fn draw(&self, encoder: &mut wgpu::CommandEncoder, frame_buffers: &FrameBuffers) {
         self.bright_pass.draw(encoder, frame_buffers);
+        self.downscale.draw(encoder, frame_buffers);
         self.blur_pass.draw(encoder, frame_buffers);
     }
 }
@@ -379,11 +385,11 @@ impl DownScale {
     }
 
     pub fn draw(&self, encoder: &mut wgpu::CommandEncoder, frame_buffers: &FrameBuffers) {
-        {
+        for buf in &frame_buffers.bloom_blur_buffers {
             let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Bloom Scale Down Render Pass"),
                 color_attachments: &[wgpu::RenderPassColorAttachment {
-                    view: &frame_buffers.bright_texture_view,
+                    view: &buf[1].texture_view,
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
@@ -550,16 +556,16 @@ impl BlurPass {
     pub fn draw(&self, encoder: &mut wgpu::CommandEncoder, frame_buffers: &FrameBuffers) {
         let attachment_views = (&frame_buffers.bloom_blur_buffers)
             .into_iter()
-            .map(|buffers| [&buffers[1].texture_view, &buffers[0].texture_view]);
+            .map(|buffers| [&buffers[0].texture_view, &buffers[1].texture_view]);
 
         for (attachment_views, bind_groups) in
             std::iter::zip(attachment_views, &self.blur_bind_groups)
         {
-            for (attachment_view, bind_group) in std::iter::zip(attachment_views, bind_groups) {
+            for i in 0..8 {
                 let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                     label: Some("Bloom Blur Render Pass"),
                     color_attachments: &[wgpu::RenderPassColorAttachment {
-                        view: attachment_view,
+                        view: attachment_views[i % 2],
                         resolve_target: None,
                         ops: wgpu::Operations {
                             load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
@@ -568,7 +574,7 @@ impl BlurPass {
                     }],
                     depth_stencil_attachment: None,
                 });
-                rpass.set_bind_group(0, &bind_group, &[]);
+                rpass.set_bind_group(0, &bind_groups[(i + 1) % 2], &[]);
                 rpass.set_pipeline(&self.blur_render_pipeline);
                 rpass.draw(0..3, 0..1);
             }
