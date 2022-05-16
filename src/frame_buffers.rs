@@ -45,7 +45,7 @@ pub struct FrameBuffers {
     pub bright_texture: wgpu::Texture,
     pub bright_texture_view: wgpu::TextureView,
     pub bloom_blur_buffers: Vec<[FrameBuffer; 2]>,
-    // pub bloom_buffer: FrameBuffer,
+    pub bloom_buffer: FrameBuffer,
 }
 
 impl FrameBuffers {
@@ -64,6 +64,7 @@ impl FrameBuffers {
         let bright_texture_view = Self::create_bright_texture_view(&bright_texture);
 
         let bloom_blur_buffers = Self::create_bloom_blur_buffers(device, width, height);
+        let bloom_buffer = FrameBuffer::new_hdr_color(device, width, height);
 
         Self {
             color_texture,
@@ -73,6 +74,7 @@ impl FrameBuffers {
             bright_texture,
             bright_texture_view,
             bloom_blur_buffers,
+            bloom_buffer,
         }
     }
 
@@ -151,7 +153,7 @@ impl FrameBuffers {
     ) -> Vec<[FrameBuffer; 2]> {
         (0..4)
             .map(|i| {
-                let divisor = 4 * (1 + 2 * i); // 4, 8, 16, 32, ...
+                let divisor = 4 * (2 * (i + 1)); // 4, 8, 16, 32, ...
                 let width = base_width / divisor;
                 let height = base_height / divisor;
                 [
@@ -170,5 +172,6 @@ impl FrameBuffers {
         self.bright_texture = Self::create_bright_texture(device, width, height);
         self.bright_texture_view = Self::create_bright_texture_view(&self.bright_texture);
         self.bloom_blur_buffers = Self::create_bloom_blur_buffers(device, width, height);
+        self.bloom_buffer = FrameBuffer::new_hdr_color(device, width, height);
     }
 }
