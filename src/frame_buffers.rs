@@ -1,9 +1,9 @@
-use std::num::NonZeroU32;
-
 pub struct FrameBuffer {
     pub texture: wgpu::Texture,
     pub texture_view: wgpu::TextureView,
     pub format: wgpu::TextureFormat,
+    pub width: u32,
+    pub height: u32,
 }
 
 impl FrameBuffer {
@@ -30,6 +30,8 @@ impl FrameBuffer {
             texture,
             texture_view,
             format,
+            width,
+            height,
         }
     }
 }
@@ -42,7 +44,8 @@ pub struct FrameBuffers {
     pub depth_texture_view: wgpu::TextureView,
     pub bright_texture: wgpu::Texture,
     pub bright_texture_view: wgpu::TextureView,
-    pub bloom_blur_buffers: Vec<FrameBuffer>,
+    pub bloom_blur_buffers: Vec<[FrameBuffer; 2]>,
+    // pub bloom_buffer: FrameBuffer,
 }
 
 impl FrameBuffers {
@@ -145,11 +148,17 @@ impl FrameBuffers {
         device: &wgpu::Device,
         base_width: u32,
         base_height: u32,
-    ) -> Vec<FrameBuffer> {
-        let width = base_width / 4;
-        let height = base_height / 4;
-        (0..3)
-            .map(|_| FrameBuffer::new_hdr_color(device, width, height))
+    ) -> Vec<[FrameBuffer; 2]> {
+        (0..4)
+            .map(|i| {
+                let divisor = 4 * (1 + 2 * i); // 4, 8, 16, 32, ...
+                let width = base_width / divisor;
+                let height = base_height / divisor;
+                [
+                    FrameBuffer::new_hdr_color(device, width, height),
+                    FrameBuffer::new_hdr_color(device, width, height),
+                ]
+            })
             .collect::<Vec<_>>()
     }
 

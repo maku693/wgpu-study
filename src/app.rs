@@ -47,7 +47,7 @@ impl App {
                     rotation: Quat::from_axis_angle(Vec3::X, PI * -0.25),
                     scale: Vec3::ONE * 1.5,
                 },
-                max_count: 1000,
+                max_count: 10000,
                 particle_size: 0.01,
                 lifetime: 0,
                 min_speed: 0.01,
