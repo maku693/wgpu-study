@@ -38,8 +38,6 @@ impl FrameBuffer {
 
 pub struct FrameBuffers {
     // TODO: migrate all to FrameBuffer struct
-    pub color_ms_texture: wgpu::Texture,
-    pub color_ms_texture_view: wgpu::TextureView,
     pub color_texture: wgpu::Texture,
     pub color_texture_view: wgpu::TextureView,
     pub depth_texture: wgpu::Texture,
@@ -56,8 +54,6 @@ impl FrameBuffers {
     pub const BLOOM_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba16Float;
 
     pub fn new(device: &wgpu::Device, width: u32, height: u32) -> Self {
-        let color_ms_texture = Self::create_color_ms_texture(device, width, height);
-        let color_ms_texture_view = Self::create_color_ms_texture_view(&color_ms_texture);
         let color_texture = Self::create_color_texture(device, width, height);
         let color_texture_view = Self::create_color_texture_view(&color_texture);
 
@@ -71,8 +67,6 @@ impl FrameBuffers {
         let bloom_buffer = FrameBuffer::new_hdr_color(device, width, height);
 
         Self {
-            color_ms_texture,
-            color_ms_texture_view,
             color_texture,
             color_texture_view,
             depth_texture,
@@ -82,28 +76,6 @@ impl FrameBuffers {
             bloom_blur_buffers,
             bloom_buffer,
         }
-    }
-
-    fn create_color_ms_texture(device: &wgpu::Device, width: u32, height: u32) -> wgpu::Texture {
-        device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("Offscreen Color Texture"),
-            size: wgpu::Extent3d {
-                width,
-                height,
-                depth_or_array_layers: 1,
-            },
-            mip_level_count: 1,
-            sample_count: 4,
-            dimension: wgpu::TextureDimension::D2,
-            format: Self::COLOR_FORMAT,
-            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::RENDER_ATTACHMENT,
-        })
-    }
-
-    fn create_color_ms_texture_view(texture: &wgpu::Texture) -> wgpu::TextureView {
-        texture.create_view(&wgpu::TextureViewDescriptor {
-            ..Default::default()
-        })
     }
 
     fn create_color_texture(device: &wgpu::Device, width: u32, height: u32) -> wgpu::Texture {
@@ -137,7 +109,7 @@ impl FrameBuffers {
                 depth_or_array_layers: 1,
             },
             mip_level_count: 1,
-            sample_count: 4,
+            sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
             format: Self::DEPTH_FORMAT,
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
