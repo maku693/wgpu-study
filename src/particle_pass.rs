@@ -233,7 +233,10 @@ impl ParticleRenderer {
                         clamp: 0.0,
                     },
                 }),
-                multisample: wgpu::MultisampleState::default(),
+                multisample: wgpu::MultisampleState {
+                    count: 4,
+                    ..Default::default()
+                },
                 multiview: None,
             });
 
@@ -246,7 +249,7 @@ impl ParticleRenderer {
                         depth_read_only: false,
                         stencil_read_only: true,
                     }),
-                    sample_count: 1,
+                    sample_count: 4,
                     multiview: None,
                 });
 
@@ -295,8 +298,8 @@ impl ParticleRenderer {
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: None,
             color_attachments: &[wgpu::RenderPassColorAttachment {
-                view: &frame_buffers.color_texture_view,
-                resolve_target: None,
+                view: &frame_buffers.color_ms_texture_view,
+                resolve_target: Some(&frame_buffers.color_texture_view),
                 ops: wgpu::Operations {
                     load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
                     store: true,
