@@ -1,7 +1,7 @@
 use std::{
-    f32::consts::PI,
+    f32::consts::{PI, TAU},
     future::Future,
-    time::{SystemTime, UNIX_EPOCH},
+    time::Instant,
 };
 
 use anyhow::{Ok, Result};
@@ -19,6 +19,7 @@ use crate::{
 };
 
 pub struct App {
+    new_at: Instant,
     window: Window,
     scene: Scene,
     renderer: Renderer,
@@ -27,6 +28,8 @@ pub struct App {
 
 impl App {
     pub async fn new(window: Window) -> Result<Self> {
+        let new_at = Instant::now();
+
         let scene = Scene {
             camera: {
                 let inner_size = window.inner_size();
@@ -66,6 +69,7 @@ impl App {
         let renderer = Renderer::new(&window, &scene).await?;
 
         Ok(Self {
+            new_at,
             window,
             scene,
             renderer,
@@ -136,15 +140,11 @@ impl App {
     }
 
     pub fn render(&mut self) -> impl Future<Output = ()> {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_millis() as f64
-            * 0.001;
+        let now = Instant::now().duration_since(self.new_at).as_millis() as f32 * 0.001;
 
-        self.scene.particle_system.transform.rotation *= Quat::from_axis_angle(Vec3::Y, PI * 0.001);
+        self.scene.particle_system.transform.rotation = Quat::from_axis_angle(Vec3::Y, now * 0.01);
 
-        let scale = ((std::f64::consts::TAU * now * 0.01).cos() + 1.0) * 0.5;
+        let scale = ((TAU * now * 0.01).cos() + 1.0) * 0.5;
         let scale = scale * 8.0 + 2.0;
         self.scene.particle_system.transform.scale = Vec3::ONE * scale as f32;
 
