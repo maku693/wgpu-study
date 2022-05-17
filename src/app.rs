@@ -1,7 +1,10 @@
-use std::{f32::consts::PI, future::Future};
+use std::{
+    f32::consts::PI,
+    future::Future,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 use anyhow::{Ok, Result};
-use chrono::prelude::*;
 use glam::{vec3, EulerRot, Quat, Vec3};
 use log::{debug, info};
 use winit::{
@@ -133,7 +136,11 @@ impl App {
     }
 
     pub fn render(&mut self) -> impl Future<Output = ()> {
-        let now = Local::now().timestamp_millis() as f64 * 0.001;
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as f64
+            * 0.001;
 
         self.scene.particle_system.transform.rotation *= Quat::from_axis_angle(Vec3::Y, PI * 0.001);
 
