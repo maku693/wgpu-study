@@ -1,12 +1,36 @@
+use std::mem::size_of;
+
+use bytemuck::{bytes_of, Pod, Zeroable};
+
+use crate::entity::Scene;
+
+#[derive(Debug, Copy, Clone, PartialEq, Default, Pod, Zeroable)]
+#[repr(C)]
+struct Uniforms {
+    exposure: f32,
+}
+
+impl Uniforms {
+    fn new(scene: &Scene) -> Self {
+        Self {
+            exposure: scene.camera.camera.exposure,
+        }
+    }
+}
+
 pub struct ComposeRenderPass {
+    uniform_buffer: wgpu::Buffer,
     render_pipeline: wgpu::RenderPipeline,
-    bind_group0: wgpu::BindGroup,
-    bind_group_layout1: wgpu::BindGroupLayout,
-    bind_group1: Option<wgpu::BindGroup>,
+    bind_group: wgpu::BindGroup,
 }
 
 impl ComposeRenderPass {
-    pub fn new(device: &wgpu::Device, render_target_format: wgpu::TextureFormat) -> Self {
+    pub fn new(
+        device: &wgpu::Device,
+        color_texture_view: &wgpu::TextureView,
+        bloom_texture_view: &wgpu::TextureView,
+        render_target_format: wgpu::TextureFormat,
+    ) -> Self {
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
             label: Some("Compose Render Pass Bilinear Sampler"),
             mag_filter: wgpu::FilterMode::Linear,
@@ -14,25 +38,34 @@ impl ComposeRenderPass {
             ..Default::default()
         });
 
-        let vertex_shader_module =
-            device.create_shader_module(&wgpu::include_wgsl!("vs_fullscreen.wgsl"));
+        let uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Bright Pass Uniform Buffer"),
+            size: size_of::<Uniforms>() as _,
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
 
-        let bind_group_layout0 =
-            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                label: None,
-                entries: &[wgpu::BindGroupLayoutEntry {
+        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: None,
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
                     binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: wgpu::BufferSize::new(size_of::<Uniforms>() as _),
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
                     visibility: wgpu::ShaderStages::FRAGMENT,
                     ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                     count: None,
-                }],
-            });
-
-        let bind_group_layout1 =
-            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                label: None,
-                entries: &[wgpu::BindGroupLayoutEntry {
-                    binding: 0,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 2,
                     visibility: wgpu::ShaderStages::FRAGMENT,
                     ty: wgpu::BindingType::Texture {
                         sample_type: wgpu::TextureSampleType::Float { filterable: true },
@@ -40,21 +73,34 @@ impl ComposeRenderPass {
                         multisampled: false,
                     },
                     count: None,
-                }],
-            });
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 3,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        multisampled: false,
+                    },
+                    count: None,
+                },
+            ],
+        });
 
         let render_pipeline = {
             let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: None,
-                bind_group_layouts: &[&bind_group_layout0, &bind_group_layout1],
+                bind_group_layouts: &[&bind_group_layout],
                 push_constant_ranges: &[],
             });
 
+            let vertex_shader_module =
+                device.create_shader_module(&wgpu::include_wgsl!("vs_fullscreen.wgsl"));
             let fragment_shader_module =
-                device.create_shader_module(&wgpu::include_wgsl!("fs_copy.wgsl"));
+                device.create_shader_module(&wgpu::include_wgsl!("fs_compose.wgsl"));
 
             device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-                label: Some("Post Process Sampling Render Pipeline"),
+                label: Some("Post Process Compose Render Pipeline"),
                 layout: Some(&pipeline_layout),
                 vertex: wgpu::VertexState {
                     module: &vertex_shader_module,
@@ -73,43 +119,43 @@ impl ComposeRenderPass {
             })
         };
 
-        let bind_group0 = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: None,
-            layout: &bind_group_layout0,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: wgpu::BindingResource::Sampler(&sampler),
-            }],
+            layout: &bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: uniform_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&sampler),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::TextureView(color_texture_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: wgpu::BindingResource::TextureView(bloom_texture_view),
+                },
+            ],
         });
 
         Self {
+            uniform_buffer,
             render_pipeline,
-            bind_group0,
-            bind_group_layout1,
-            bind_group1: None,
+            bind_group,
         }
     }
 
-    pub fn use_color_target_texture_view(
-        &mut self,
-        device: &wgpu::Device,
-        src_texture_view: &wgpu::TextureView,
-    ) {
-        self.bind_group1 = Some(device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: None,
-            layout: &self.bind_group_layout1,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: wgpu::BindingResource::TextureView(&src_texture_view),
-            }],
-        }));
+    pub fn update(&self, queue: &wgpu::Queue, scene: &Scene) {
+        queue.write_buffer(&self.uniform_buffer, 0, bytes_of(&Uniforms::new(scene)));
     }
 
     pub fn draw<'rpass>(&'rpass self, rpass: &mut impl wgpu::util::RenderEncoder<'rpass>) {
         rpass.set_pipeline(&self.render_pipeline);
-        rpass.set_bind_group(0, &self.bind_group0, &[]);
-        rpass.set_bind_group(1, &self.bind_group0, &[]);
-        rpass.set_bind_group(2, self.bind_group1.as_ref().unwrap(), &[]);
+        rpass.set_bind_group(0, &self.bind_group, &[]);
         rpass.draw(0..3, 0..1);
     }
 }

@@ -1,11 +1,9 @@
-pub struct BlurRenderer {
+pub struct BlurRenderPass {
     render_pipeline: wgpu::RenderPipeline,
-    bind_group0: wgpu::BindGroup,
-    bind_group_layout1: wgpu::BindGroupLayout,
-    bind_group1: wgpu::BindGroup,
+    bind_group: wgpu::BindGroup,
 }
 
-impl BlurRenderer {
+impl BlurRenderPass {
     pub fn new(
         device: &wgpu::Device,
         src_texture_view: &wgpu::TextureView,
@@ -18,25 +16,17 @@ impl BlurRenderer {
             ..Default::default()
         });
 
-        let vertex_shader_module =
-            device.create_shader_module(&wgpu::include_wgsl!("vs_fullscreen.wgsl"));
-
-        let bind_group_layout0 =
-            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                label: None,
-                entries: &[wgpu::BindGroupLayoutEntry {
+        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: None,
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
                     binding: 0,
                     visibility: wgpu::ShaderStages::FRAGMENT,
                     ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                     count: None,
-                }],
-            });
-
-        let bind_group_layout1 =
-            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                label: None,
-                entries: &[wgpu::BindGroupLayoutEntry {
-                    binding: 0,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
                     visibility: wgpu::ShaderStages::FRAGMENT,
                     ty: wgpu::BindingType::Texture {
                         sample_type: wgpu::TextureSampleType::Float { filterable: true },
@@ -44,16 +34,19 @@ impl BlurRenderer {
                         multisampled: false,
                     },
                     count: None,
-                }],
-            });
+                },
+            ],
+        });
 
         let render_pipeline = {
             let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: None,
-                bind_group_layouts: &[&bind_group_layout0, &bind_group_layout1],
+                bind_group_layouts: &[&bind_group_layout],
                 push_constant_ranges: &[],
             });
 
+            let vertex_shader_module =
+                device.create_shader_module(&wgpu::include_wgsl!("vs_fullscreen.wgsl"));
             let fragment_shader_module =
                 device.create_shader_module(&wgpu::include_wgsl!("fs_blur.wgsl"));
 
@@ -77,53 +70,30 @@ impl BlurRenderer {
             })
         };
 
-        let bind_group0 = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: None,
-            layout: &bind_group_layout0,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: wgpu::BindingResource::Sampler(&sampler),
-            }],
+            layout: &bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::Sampler(&sampler),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::TextureView(src_texture_view),
+                },
+            ],
         });
-
-        let bind_group1 = Self::create_bind_group1(device, src_texture_view, &bind_group_layout1);
 
         Self {
             render_pipeline,
-            bind_group0,
-            bind_group_layout1,
-            bind_group1,
+            bind_group,
         }
-    }
-
-    pub fn use_src_texture_view(
-        &mut self,
-        device: &wgpu::Device,
-        src_texture_view: &wgpu::TextureView,
-    ) {
-        self.bind_group1 =
-            Self::create_bind_group1(device, src_texture_view, &self.bind_group_layout1);
-    }
-
-    fn create_bind_group1(
-        device: &wgpu::Device,
-        src_texture_view: &wgpu::TextureView,
-        layout: &wgpu::BindGroupLayout,
-    ) -> wgpu::BindGroup {
-        device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: None,
-            layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: wgpu::BindingResource::TextureView(src_texture_view),
-            }],
-        })
     }
 
     pub fn draw<'rpass>(&'rpass self, rpass: &mut impl wgpu::util::RenderEncoder<'rpass>) {
         rpass.set_pipeline(&self.render_pipeline);
-        rpass.set_bind_group(0, &self.bind_group0, &[]);
-        rpass.set_bind_group(1, &self.bind_group1, &[]);
+        rpass.set_bind_group(0, &self.bind_group, &[]);
         rpass.draw(0..3, 0..1);
     }
 }

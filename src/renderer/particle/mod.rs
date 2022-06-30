@@ -9,8 +9,6 @@ use wgpu::util::DeviceExt;
 
 use crate::{component::Particle, entity::Scene};
 
-use super::buffer_writer::BufferWriter;
-
 const QUAD_VERTICES: [Vec3; 4] = [
     const_vec3!([-0.5, -0.5, 0.]),
     const_vec3!([-0.5, 0.5, 0.]),
@@ -130,15 +128,15 @@ pub struct ParticleRenderer {
 }
 
 impl ParticleRenderer {
-    pub fn update(&self, writer: &impl BufferWriter, scene: &Scene) {
+    pub fn update(&self, queue: &wgpu::Queue, scene: &Scene) {
         if self.particle_cache != scene.particle.particle {
-            writer.write_buffer(
+            queue.write_buffer(
                 &self.instance_buffer,
                 0,
                 cast_slice(&Instances::new(&scene.particle.particle).as_slice()),
             );
         }
-        writer.write_buffer(&self.uniform_buffer, 0, bytes_of(&Uniforms::new(scene)));
+        queue.write_buffer(&self.uniform_buffer, 0, bytes_of(&Uniforms::new(scene)));
     }
 
     pub fn draw<'rpass>(&'rpass self, rpass: &mut impl wgpu::util::RenderEncoder<'rpass>) {

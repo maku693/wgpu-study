@@ -17,16 +17,6 @@ impl From<winit::dpi::PhysicalSize<u32>> for Size {
     }
 }
 
-impl Into<wgpu::Extent3d> for Size {
-    fn into(self) -> wgpu::Extent3d {
-        wgpu::Extent3d {
-            width: self.width,
-            height: self.height,
-            depth_or_array_layers: 1,
-        }
-    }
-}
-
 impl HasSize for winit::window::Window {
     fn size(&self) -> Size {
         self.inner_size().into()

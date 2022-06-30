@@ -1,8 +1,11 @@
+mod add;
 mod blur;
 mod bright_pass;
 mod compose;
 mod copy;
 
-pub use blur::BlurRenderer;
-pub use bright_pass::BrightPassRenderer;
-pub use copy::CopyRenderer;
+pub use add::AddRenderPass;
+pub use blur::BlurRenderPass;
+pub use bright_pass::BrightPassRenderPass;
+pub use compose::ComposeRenderPass;
+pub use copy::CopyRenderPass;

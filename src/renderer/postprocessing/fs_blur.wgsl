@@ -7,8 +7,7 @@ var<private> blur_sample_texel_offsets: array<vec2<f32>, 4> = array<vec2<f32>, 4
 
 @group(0) @binding(0)
 var r_sampler: sampler;
-
-@group(1) @binding(0)
+@group(0) @binding(1)
 var r_texture: texture_2d<f32>;
 
 @fragment
