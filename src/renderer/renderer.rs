@@ -2,14 +2,16 @@ use anyhow::{Context, Ok, Result};
 
 use crate::{
     entity::Scene,
-    renderer::{
-        particle::{ParticleRenderer, ParticleRendererBuilder},
-        postprocessing::{BlurRenderPass, BrightPassRenderPass, ComposeRenderPass},
-    },
     window::{Size, Window},
 };
 
-use super::postprocessing::{AddRenderPass, CopyRenderPass};
+use super::{
+    particle::{ParticleRenderer, ParticleRendererBuilder},
+    postprocessing::{
+        AddRenderPass, BlurDownsampleRenderPass, BlurRenderPass, BlurUpsampleRenderPass,
+        BrightPassRenderPass, ComposeRenderPass, CopyRenderPass,
+    },
+};
 
 const HDR_TEXTURE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba16Float;
 const DEPTH_TEXTURE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
@@ -25,6 +27,8 @@ pub struct Renderer {
     bloom_blur_render_pass: BlurRenderPass,
     bloom_combine_render_pass: AddRenderPass,
     bloom_blur_render_passes: Vec<BlurRenderPass>,
+    bloom_blur_downsample_render_passes: Vec<BlurDownsampleRenderPass>,
+    bloom_blur_upsample_render_passes: Vec<BlurUpsampleRenderPass>,
     bloom_combine_render_passes: Vec<CopyRenderPass>,
     compose_render_pass: ComposeRenderPass,
 }
@@ -83,14 +87,48 @@ impl Renderer {
                 .collect::<Vec<_>>()
         };
 
+        let bloom_blur_downsample_render_passes = {
+            let all_blur_texture_views_but_last = render_targets
+                .bloom_blur_downsample
+                .iter()
+                .take(render_targets.bloom_blur.len() - 1);
+            let src_texture_views =
+                std::iter::once(&render_targets.bright_pass).chain(all_blur_texture_views_but_last);
+
+            src_texture_views
+                .map(|src_texture_view| {
+                    BlurDownsampleRenderPass::new(&device, src_texture_view, HDR_TEXTURE_FORMAT)
+                })
+                .collect::<Vec<_>>()
+        };
+
+        let bloom_blur_upsample_render_passes = {
+            let last_blur_downsample_texture_view =
+                render_targets.bloom_blur_downsample.last().into_iter();
+            let all_blur_downsample_texture_views_but_last = render_targets
+                .bloom_blur_upsample
+                .iter()
+                .take(render_targets.bloom_blur_upsample.len() - 1);
+            let src_texture_views =
+                last_blur_downsample_texture_view.chain(all_blur_downsample_texture_views_but_last);
+            src_texture_views
+                .map(|src_texture_view| {
+                    BlurUpsampleRenderPass::new(&device, src_texture_view, HDR_TEXTURE_FORMAT)
+                })
+                .collect::<Vec<_>>()
+        };
+
         let bloom_combine_render_pass = AddRenderPass::new(
             &device,
-            &[&render_targets.bloom_blur[0], &render_targets.bloom_blur[1]],
+            &[
+                &render_targets.bloom_blur_upsample[1],
+                &render_targets.bloom_blur_upsample[0],
+            ],
             HDR_TEXTURE_FORMAT,
         );
 
         let bloom_combine_render_passes = render_targets
-            .bloom_blur
+            .bloom_blur_upsample
             .iter()
             .map(|texture_view| CopyRenderPass::new(&device, texture_view, HDR_TEXTURE_FORMAT))
             .collect::<Vec<_>>();
@@ -113,6 +151,8 @@ impl Renderer {
             bloom_blur_render_pass,
             bloom_combine_render_pass,
             bloom_blur_render_passes,
+            bloom_blur_downsample_render_passes,
+            bloom_blur_upsample_render_passes,
             bloom_combine_render_passes,
             compose_render_pass,
         })
@@ -226,11 +266,27 @@ impl Renderer {
         //     self.bloom_blur_render_pass.draw(&mut rpass);
         // }
 
-        for i in 0..self.render_targets.bloom_blur.len() {
+        // for i in 0..self.render_targets.bloom_blur.len() {
+        //     let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+        //         label: Some(format!("Bloom Blur Render Pass {}", i).as_str()),
+        //         color_attachments: &[wgpu::RenderPassColorAttachment {
+        //             view: &self.render_targets.bloom_blur[i],
+        //             resolve_target: None,
+        //             ops: wgpu::Operations {
+        //                 load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+        //                 store: true,
+        //             },
+        //         }],
+        //         depth_stencil_attachment: None,
+        //     });
+        //     self.bloom_blur_render_passes[i].draw(&mut rpass);
+        // }
+
+        for i in 0..self.render_targets.bloom_blur_downsample.len() {
             let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some(format!("Bloom Blur Render Pass {}", i).as_str()),
                 color_attachments: &[wgpu::RenderPassColorAttachment {
-                    view: &self.render_targets.bloom_blur[i],
+                    view: &self.render_targets.bloom_blur_downsample[i],
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
@@ -239,7 +295,23 @@ impl Renderer {
                 }],
                 depth_stencil_attachment: None,
             });
-            self.bloom_blur_render_passes[i].draw(&mut rpass);
+            self.bloom_blur_downsample_render_passes[i].draw(&mut rpass);
+        }
+
+        for (i, render_target) in self.render_targets.bloom_blur_upsample.iter().enumerate() {
+            let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some(format!("Bloom Blur Render Pass {}", i).as_str()),
+                color_attachments: &[wgpu::RenderPassColorAttachment {
+                    view: &render_target,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+                        store: true,
+                    },
+                }],
+                depth_stencil_attachment: None,
+            });
+            self.bloom_blur_upsample_render_passes[i].draw(&mut rpass);
         }
 
         {
@@ -295,6 +367,8 @@ struct RenderTargets {
     depth: wgpu::TextureView,
     bright_pass: wgpu::TextureView,
     bloom_blur: Vec<wgpu::TextureView>,
+    bloom_blur_downsample: Vec<wgpu::TextureView>,
+    bloom_blur_upsample: Vec<wgpu::TextureView>,
     bloom: wgpu::TextureView,
 }
 
@@ -317,8 +391,8 @@ impl RenderTargets {
         let bright_pass = Self::create_render_target_texture_view(
             device,
             "Bright Pass Texture",
-            width / 4,
-            height / 4,
+            width,
+            height,
             HDR_TEXTURE_FORMAT,
         );
         let bloom_blur = (0..16)
@@ -326,8 +400,32 @@ impl RenderTargets {
                 Self::create_render_target_texture_view(
                     device,
                     format!("Blur Texture {}", i).as_str(),
-                    width / 4,
-                    height / 4,
+                    width / 2,
+                    height / 2,
+                    HDR_TEXTURE_FORMAT,
+                )
+            })
+            .collect::<Vec<_>>();
+        let bloom_blur_downsample = (0..4)
+            .map(|i| {
+                let divisor = 2u32.pow(i); // 2, 4, 8, 16
+                Self::create_render_target_texture_view(
+                    device,
+                    format!("Bloom Blur Downsample Texture {}", i).as_str(),
+                    width / divisor,
+                    height / divisor,
+                    HDR_TEXTURE_FORMAT,
+                )
+            })
+            .collect::<Vec<_>>();
+        let bloom_blur_upsample = (0..4)
+            .map(|i| {
+                let divisor = 2u32.pow(3 - i); // 8, 4, 2, 1
+                Self::create_render_target_texture_view(
+                    device,
+                    format!("Bloom Blur Upsample Texture {}", i).as_str(),
+                    width / divisor,
+                    height / divisor,
                     HDR_TEXTURE_FORMAT,
                 )
             })
@@ -345,6 +443,8 @@ impl RenderTargets {
             depth,
             bright_pass,
             bloom_blur,
+            bloom_blur_downsample,
+            bloom_blur_upsample,
             bloom,
         }
     }
