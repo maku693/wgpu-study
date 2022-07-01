@@ -64,7 +64,7 @@ impl App {
             },
             post_processing: PostProcessing {
                 bloom: component::Bloom {
-                    intensity: 1.0,
+                    intensity: 4.0,
                     threshold: 1.0,
                 },
             },
