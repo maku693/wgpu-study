@@ -317,18 +317,17 @@ impl RenderTargets {
         let bright_pass = Self::create_render_target_texture_view(
             device,
             "Bright Pass Texture",
-            width,
-            height,
+            width / 4,
+            height / 4,
             HDR_TEXTURE_FORMAT,
         );
-        let bloom_blur = (0..8)
+        let bloom_blur = (0..16)
             .map(|i| {
-                let divisor = 2_u32.pow(i); // 1, 2, 4, 8, 16, 32
                 Self::create_render_target_texture_view(
                     device,
                     format!("Blur Texture {}", i).as_str(),
-                    width / divisor,
-                    height / divisor,
+                    width / 4,
+                    height / 4,
                     HDR_TEXTURE_FORMAT,
                 )
             })
