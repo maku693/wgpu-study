@@ -59,7 +59,7 @@ impl App {
                     max_count: 1000,
                     particle_size: 0.01,
                     position_range: (Vec3::ONE * -0.5, Vec3::ONE * 0.5),
-                    color_range: (Vec3::ONE * 5.0, Vec3::ONE * 100.0),
+                    color_range: (Vec3::ONE * 50.0, Vec3::ONE * 200.0),
                 },
             },
             post_processing: PostProcessing {
