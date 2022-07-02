@@ -17,7 +17,7 @@ impl CopyRenderPass {
         });
 
         let vertex_shader_module =
-            device.create_shader_module(&wgpu::include_wgsl!("vs_fullscreen.wgsl"));
+            device.create_shader_module(&wgpu::include_wgsl!("fullscreen.vertex.wgsl"));
 
         let bind_group_layout0 =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -50,7 +50,7 @@ impl CopyRenderPass {
             });
 
             let fragment_shader_module =
-                device.create_shader_module(&wgpu::include_wgsl!("fs_copy.wgsl"));
+                device.create_shader_module(&wgpu::include_wgsl!("copy.fragment.wgsl"));
 
             device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
                 label: Some("Copy Render Pipeline"),

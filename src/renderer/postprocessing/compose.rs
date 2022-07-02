@@ -95,9 +95,9 @@ impl ComposeRenderPass {
             });
 
             let vertex_shader_module =
-                device.create_shader_module(&wgpu::include_wgsl!("vs_fullscreen.wgsl"));
+                device.create_shader_module(&wgpu::include_wgsl!("fullscreen.vertex.wgsl"));
             let fragment_shader_module =
-                device.create_shader_module(&wgpu::include_wgsl!("fs_compose.wgsl"));
+                device.create_shader_module(&wgpu::include_wgsl!("compose.fragment.wgsl"));
 
             device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
                 label: Some("Post Process Compose Render Pipeline"),
