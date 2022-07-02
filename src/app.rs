@@ -59,12 +59,12 @@ impl App {
                     max_count: 1000,
                     particle_size: 0.01,
                     position_range: (Vec3::ONE * -0.5, Vec3::ONE * 0.5),
-                    color_range: (Vec3::ONE * 5.0, Vec3::ONE * 50.0),
+                    color_range: (Vec3::ONE * 5.0, Vec3::ONE * 100.0),
                 },
             },
             post_processing: PostProcessing {
                 bloom: component::Bloom {
-                    intensity: 4.0,
+                    intensity: 1.0,
                     threshold: 1.0,
                 },
             },

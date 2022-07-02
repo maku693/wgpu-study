@@ -297,10 +297,11 @@ impl RenderTargets {
             HDR_TEXTURE_FORMAT,
         );
 
+        let base_divisor = 2;
         let num_levels = 4;
         let bloom_blur_downsample = (0..num_levels)
             .map(|i| {
-                let divisor = 2u32.pow(1 + i); // 2, 4, 8, 16
+                let divisor = base_divisor * 2u32.pow(1 + i); // 2, 4, 8, 16
                 Self::create_render_target_texture_view(
                     device,
                     format!("Bloom Blur Downsample Texture {}", i).as_str(),
@@ -313,7 +314,7 @@ impl RenderTargets {
         let bloom_blur_upsample = (0..num_levels)
             .rev()
             .map(|i| {
-                let divisor = 2u32.pow(i); // 8, 4, 2, 1
+                let divisor = base_divisor * 2u32.pow(i); // 8, 4, 2, 1
                 Self::create_render_target_texture_view(
                     device,
                     format!("Bloom Blur Upsample Texture {}", i).as_str(),
