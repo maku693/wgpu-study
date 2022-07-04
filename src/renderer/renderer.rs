@@ -62,8 +62,11 @@ impl Renderer {
             .depth_format(DEPTH_TEXTURE_FORMAT)
             .build(&device);
 
-        let bright_pass_render_pass =
-            BrightPassRenderPass::new(&device, &render_targets.color, HDR_TEXTURE_FORMAT);
+        let bright_pass_render_pass = BrightPassRenderPass::new(
+            &device,
+            &render_targets.color.texture_view,
+            HDR_TEXTURE_FORMAT,
+        );
 
         let bloom_blur_downsample_render_passes = {
             let all_blur_texture_views_but_last = render_targets
@@ -75,7 +78,13 @@ impl Renderer {
 
             src_texture_views
                 .map(|src_texture_view| {
-                    BlurDownsampleRenderPass::new(&device, src_texture_view, HDR_TEXTURE_FORMAT)
+                    BlurDownsampleRenderPass::new(
+                        &device,
+                        &src_texture_view.texture_view,
+                        HDR_TEXTURE_FORMAT,
+                        src_texture_view.width / 2,
+                        src_texture_view.height / 2,
+                    )
                 })
                 .collect::<Vec<_>>()
         };
@@ -91,15 +100,25 @@ impl Renderer {
                 last_blur_downsample_texture_view.chain(all_blur_downsample_texture_views_but_last);
             src_texture_views
                 .map(|src_texture_view| {
-                    BlurUpsampleRenderPass::new(&device, src_texture_view, HDR_TEXTURE_FORMAT)
+                    BlurUpsampleRenderPass::new(
+                        &device,
+                        &src_texture_view.texture_view,
+                        HDR_TEXTURE_FORMAT,
+                        src_texture_view.width * 2,
+                        src_texture_view.height * 2,
+                    )
                 })
                 .collect::<Vec<_>>()
         };
 
         let compose_render_pass = ComposeRenderPass::new(
             &device,
-            &render_targets.color,
-            &render_targets.bloom_blur_upsample.last().unwrap(),
+            &render_targets.color.texture_view,
+            &render_targets
+                .bloom_blur_upsample
+                .last()
+                .unwrap()
+                .texture_view,
             surface_format,
         );
 
@@ -146,12 +165,20 @@ impl Renderer {
             height,
         );
         self.render_targets = RenderTargets::new(&self.device, width, height);
-        self.bright_pass_render_pass =
-            BrightPassRenderPass::new(&self.device, &self.render_targets.color, HDR_TEXTURE_FORMAT);
+        self.bright_pass_render_pass = BrightPassRenderPass::new(
+            &self.device,
+            &self.render_targets.color.texture_view,
+            HDR_TEXTURE_FORMAT,
+        );
         self.compose_render_pass = ComposeRenderPass::new(
             &self.device,
-            &self.render_targets.color,
-            &self.render_targets.bloom_blur_upsample.last().unwrap(),
+            &self.render_targets.color.texture_view,
+            &self
+                .render_targets
+                .bloom_blur_upsample
+                .last()
+                .unwrap()
+                .texture_view,
             self.surface_format,
         );
     }
@@ -169,7 +196,7 @@ impl Renderer {
             let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Particle Render Pass"),
                 color_attachments: &[wgpu::RenderPassColorAttachment {
-                    view: &self.render_targets.color,
+                    view: &self.render_targets.color.texture_view,
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
@@ -177,7 +204,7 @@ impl Renderer {
                     },
                 }],
                 depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                    view: &self.render_targets.depth,
+                    view: &self.render_targets.depth.texture_view,
                     depth_ops: Some(wgpu::Operations {
                         load: wgpu::LoadOp::Clear(1.0),
                         store: false,
@@ -192,7 +219,7 @@ impl Renderer {
             let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Bright Pass Render Pass"),
                 color_attachments: &[wgpu::RenderPassColorAttachment {
-                    view: &self.render_targets.bright_pass,
+                    view: &self.render_targets.bright_pass.texture_view,
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
@@ -208,7 +235,7 @@ impl Renderer {
             let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some(format!("Bloom Blur Downsample Render Pass {}", i).as_str()),
                 color_attachments: &[wgpu::RenderPassColorAttachment {
-                    view: &self.render_targets.bloom_blur_downsample[i],
+                    view: &self.render_targets.bloom_blur_downsample[i].texture_view,
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
@@ -224,7 +251,7 @@ impl Renderer {
             let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some(format!("Bloom Blur Upsample Render Pass {}", i).as_str()),
                 color_attachments: &[wgpu::RenderPassColorAttachment {
-                    view: &render_target,
+                    view: &render_target.texture_view,
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
@@ -265,12 +292,18 @@ impl Renderer {
     }
 }
 
+struct RenderTarget {
+    texture_view: wgpu::TextureView,
+    width: u32,
+    height: u32,
+}
+
 struct RenderTargets {
-    color: wgpu::TextureView,
-    depth: wgpu::TextureView,
-    bright_pass: wgpu::TextureView,
-    bloom_blur_downsample: Vec<wgpu::TextureView>,
-    bloom_blur_upsample: Vec<wgpu::TextureView>,
+    color: RenderTarget,
+    depth: RenderTarget,
+    bright_pass: RenderTarget,
+    bloom_blur_downsample: Vec<RenderTarget>,
+    bloom_blur_upsample: Vec<RenderTarget>,
 }
 
 impl RenderTargets {
@@ -340,7 +373,7 @@ impl RenderTargets {
         width: u32,
         height: u32,
         format: wgpu::TextureFormat,
-    ) -> wgpu::TextureView {
+    ) -> RenderTarget {
         let texture = device.create_texture(&wgpu::TextureDescriptor {
             label: Some(label),
             size: wgpu::Extent3d {
@@ -354,6 +387,11 @@ impl RenderTargets {
             format,
             usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::RENDER_ATTACHMENT,
         });
-        texture.create_view(&wgpu::TextureViewDescriptor::default())
+        let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+        RenderTarget {
+            texture_view,
+            width,
+            height,
+        }
     }
 }

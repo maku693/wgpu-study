@@ -1,3 +1,15 @@
+use std::mem::size_of;
+
+use bytemuck::{bytes_of, Pod, Zeroable};
+use glam::{vec2, Vec2};
+use wgpu::util::DeviceExt;
+
+#[derive(Debug, Copy, Clone, PartialEq, Default, Pod, Zeroable)]
+#[repr(C)]
+struct Uniforms {
+    resolution: Vec2,
+}
+
 pub struct BlurUpsampleRenderPass {
     render_pipeline: wgpu::RenderPipeline,
     bind_group: wgpu::BindGroup,
@@ -8,6 +20,8 @@ impl BlurUpsampleRenderPass {
         device: &wgpu::Device,
         src_texture_view: &wgpu::TextureView,
         render_target_format: wgpu::TextureFormat,
+        render_target_width: u32,
+        render_target_height: u32,
     ) -> Self {
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
             label: Some("Blur Upsample Bilinear Sampler"),
@@ -32,6 +46,16 @@ impl BlurUpsampleRenderPass {
                         sample_type: wgpu::TextureSampleType::Float { filterable: true },
                         view_dimension: wgpu::TextureViewDimension::D2,
                         multisampled: false,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 2,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: wgpu::BufferSize::new(size_of::<Uniforms>() as _),
                     },
                     count: None,
                 },
@@ -70,20 +94,33 @@ impl BlurUpsampleRenderPass {
             })
         };
 
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: None,
-            layout: &bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: wgpu::BindingResource::Sampler(&sampler),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::TextureView(src_texture_view),
-                },
-            ],
-        });
+        let bind_group = {
+            let resolution = vec2(render_target_width as _, render_target_height as _);
+            let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Blur Downsample Uniform Buffer"),
+                contents: bytes_of(&Uniforms { resolution }),
+                usage: wgpu::BufferUsages::UNIFORM,
+            });
+
+            device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: None,
+                layout: &bind_group_layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: wgpu::BindingResource::Sampler(&sampler),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: wgpu::BindingResource::TextureView(src_texture_view),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 2,
+                        resource: uniform_buffer.as_entire_binding(),
+                    },
+                ],
+            })
+        };
 
         Self {
             render_pipeline,
