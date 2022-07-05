@@ -7,8 +7,8 @@ use crate::entity::Scene;
 #[derive(Debug, Copy, Clone, PartialEq, Default, Pod, Zeroable)]
 #[repr(C)]
 struct Uniforms {
-    intensity: f32,
     threshold: f32,
+    intensity: f32,
 }
 
 impl Uniforms {
