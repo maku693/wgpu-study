@@ -54,7 +54,16 @@ impl Renderer {
 
         let Size { width, height } = window.size();
 
-        Self::configure_surface(&surface, &device, surface_format, width, height);
+        surface.configure(
+            &device,
+            &wgpu::SurfaceConfiguration {
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+                format: surface_format,
+                width,
+                height,
+                present_mode: wgpu::PresentMode::Fifo,
+            },
+        );
 
         let render_targets = RenderTargets::new(&device, width, height);
 
@@ -121,25 +130,6 @@ impl Renderer {
             bloom_blur_upsample_render_passes,
             compose_render_pass,
         })
-    }
-
-    fn configure_surface(
-        surface: &wgpu::Surface,
-        device: &wgpu::Device,
-        format: wgpu::TextureFormat,
-        width: u32,
-        height: u32,
-    ) {
-        surface.configure(
-            device,
-            &wgpu::SurfaceConfiguration {
-                usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-                format,
-                width,
-                height,
-                present_mode: wgpu::PresentMode::Fifo,
-            },
-        )
     }
 
     pub fn render(&mut self, scene: &Scene) {
