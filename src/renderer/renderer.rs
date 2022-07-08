@@ -6,7 +6,7 @@ use crate::{
 };
 
 use super::{
-    particle::{ParticleRenderer, ParticleRendererBuilder},
+    particle::ParticleRenderer,
     postprocessing::{
         AddRenderPass, BlurDownsampleRenderPass, BlurRenderPass, BlurUpsampleRenderPass,
         BrightPassRenderPass, ComposeRenderPass, CopyRenderPass,
@@ -58,10 +58,12 @@ impl Renderer {
 
         let render_targets = RenderTargets::new(&device, width, height);
 
-        let particle_renderer = ParticleRendererBuilder::new(scene)
-            .color_target_format(render_targets.color.texture.format())
-            .depth_format(render_targets.depth.texture.format())
-            .build(&device);
+        let particle_renderer = ParticleRenderer::new(
+            &device,
+            render_targets.color.texture.format(),
+            render_targets.depth.texture.format(),
+            scene,
+        );
 
         let bright_pass_render_pass = BrightPassRenderPass::new(
             &device,

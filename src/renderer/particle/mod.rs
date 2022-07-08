@@ -128,56 +128,12 @@ pub struct ParticleRenderer {
 }
 
 impl ParticleRenderer {
-    pub fn update(&self, queue: &wgpu::Queue, scene: &Scene) {
-        if self.particle_cache != scene.particle.particle {
-            queue.write_buffer(
-                &self.instance_buffer,
-                0,
-                cast_slice(&Instances::new(&scene.particle.particle).as_slice()),
-            );
-        }
-        queue.write_buffer(&self.uniform_buffer, 0, bytes_of(&Uniforms::new(scene)));
-    }
-
-    pub fn draw<'rpass>(&'rpass self, rpass: &mut impl wgpu::util::RenderEncoder<'rpass>) {
-        rpass.set_pipeline(&self.render_pipeline);
-        rpass.set_bind_group(0, &self.bind_group, &[]);
-        rpass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-        rpass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-        rpass.draw_indexed(0..(QUAD_INDICES.len() as _), 0, 0..self.instance_count);
-    }
-}
-
-pub struct ParticleRendererBuilder<'a> {
-    scene: &'a Scene,
-    color_format: Option<wgpu::TextureFormat>,
-    depth_format: Option<wgpu::TextureFormat>,
-}
-
-impl<'a> ParticleRendererBuilder<'a> {
-    pub fn new(scene: &'a Scene) -> Self {
-        Self {
-            scene,
-            color_format: None,
-            depth_format: None,
-        }
-    }
-
-    pub fn color_target_format(mut self, format: wgpu::TextureFormat) -> Self {
-        self.color_format = Some(format);
-        self
-    }
-
-    pub fn depth_format(mut self, format: wgpu::TextureFormat) -> Self {
-        self.depth_format = Some(format);
-        self
-    }
-
-    pub fn build(self, device: &wgpu::Device) -> ParticleRenderer {
-        let scene = self.scene;
-        let color_format = self.color_format.expect("No color format provided");
-        let depth_format = self.depth_format.expect("No depth format provided");
-
+    pub fn new(
+        device: &wgpu::Device,
+        color_format: wgpu::TextureFormat,
+        depth_format: wgpu::TextureFormat,
+        scene: &Scene,
+    ) -> Self {
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Particle Vertex Buffer"),
             contents: bytes_of(&QUAD_VERTICES),
@@ -299,7 +255,7 @@ impl<'a> ParticleRendererBuilder<'a> {
             ],
         });
 
-        ParticleRenderer {
+        Self {
             particle_cache: particle.clone(),
             vertex_buffer,
             index_buffer,
@@ -309,5 +265,24 @@ impl<'a> ParticleRendererBuilder<'a> {
             bind_group,
             render_pipeline,
         }
+    }
+
+    pub fn update(&self, queue: &wgpu::Queue, scene: &Scene) {
+        if self.particle_cache != scene.particle.particle {
+            queue.write_buffer(
+                &self.instance_buffer,
+                0,
+                cast_slice(&Instances::new(&scene.particle.particle).as_slice()),
+            );
+        }
+        queue.write_buffer(&self.uniform_buffer, 0, bytes_of(&Uniforms::new(scene)));
+    }
+
+    pub fn draw<'rpass>(&'rpass self, rpass: &mut impl wgpu::util::RenderEncoder<'rpass>) {
+        rpass.set_pipeline(&self.render_pipeline);
+        rpass.set_bind_group(0, &self.bind_group, &[]);
+        rpass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+        rpass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+        rpass.draw_indexed(0..(QUAD_INDICES.len() as _), 0, 0..self.instance_count);
     }
 }
