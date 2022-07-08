@@ -142,34 +142,6 @@ impl Renderer {
         )
     }
 
-    pub fn resize(&mut self, size: Size) {
-        let Size { width, height } = size;
-        Self::configure_surface(
-            &self.surface,
-            &self.device,
-            self.surface_format,
-            width,
-            height,
-        );
-        self.render_targets = RenderTargets::new(&self.device, width, height);
-        self.bright_pass_render_pass = BrightPassRenderPass::new(
-            &self.device,
-            self.render_targets.color.texture.wgpu_texture(),
-            HDR_TEXTURE_FORMAT,
-        );
-        self.compose_render_pass = ComposeRenderPass::new(
-            &self.device,
-            self.render_targets.color.texture.wgpu_texture(),
-            self.render_targets
-                .bloom_blur_upsample
-                .last()
-                .unwrap()
-                .texture
-                .wgpu_texture(),
-            self.surface_format,
-        );
-    }
-
     pub fn render(&mut self, scene: &Scene) {
         self.particle_renderer.update(&self.queue, scene);
         self.bright_pass_render_pass.update(&self.queue, scene);

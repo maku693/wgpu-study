@@ -6,6 +6,7 @@ use std::{
 use anyhow::{Ok, Result};
 use glam::{vec3, EulerRot, Quat, Vec3};
 use log::{debug, info};
+use pollster::FutureExt;
 use winit::{
     dpi::{PhysicalPosition, PhysicalSize},
     event::{MouseScrollDelta, VirtualKeyCode},
@@ -89,9 +90,7 @@ impl App {
             return;
         }
 
-        self.scene.camera.camera.aspect_ratio = size.width as f32 / size.height as f32;
-
-        self.renderer.resize(size.into());
+        self.renderer = Renderer::new(&self.window, &self.scene).block_on().unwrap();
     }
 
     pub fn on_mouse_up(&mut self) {
