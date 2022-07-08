@@ -284,71 +284,8 @@ struct RenderTarget {
     texture_view: wgpu::TextureView,
 }
 
-struct RenderTargets {
-    color: RenderTarget,
-    depth: RenderTarget,
-    bright_pass: RenderTarget,
-    bloom_blur_downsample: Vec<RenderTarget>,
-    bloom_blur_upsample: Vec<RenderTarget>,
-}
-
-impl RenderTargets {
-    fn new(device: &wgpu::Device, width: u32, height: u32) -> Self {
-        let color =
-            Self::create_render_target(device, "Color Texture", width, height, HDR_TEXTURE_FORMAT);
-        let depth = Self::create_render_target(
-            device,
-            "Depth Texture",
-            width,
-            height,
-            DEPTH_TEXTURE_FORMAT,
-        );
-        let bright_pass = Self::create_render_target(
-            device,
-            "Bright Pass Texture",
-            width,
-            height,
-            HDR_TEXTURE_FORMAT,
-        );
-
-        let base_divisor = 1;
-        let num_levels = 3;
-        let bloom_blur_downsample = (0..num_levels)
-            .map(|i| {
-                let divisor = base_divisor * 2u32.pow(1 + i); // 2, 4, 8, 16
-                Self::create_render_target(
-                    device,
-                    format!("Bloom Blur Downsample Texture {}", i).as_str(),
-                    width / divisor,
-                    height / divisor,
-                    HDR_TEXTURE_FORMAT,
-                )
-            })
-            .collect::<Vec<_>>();
-        let bloom_blur_upsample = (0..num_levels)
-            .rev()
-            .map(|i| {
-                let divisor = base_divisor * 2u32.pow(i); // 8, 4, 2, 1
-                Self::create_render_target(
-                    device,
-                    format!("Bloom Blur Upsample Texture {}", i).as_str(),
-                    width / divisor,
-                    height / divisor,
-                    HDR_TEXTURE_FORMAT,
-                )
-            })
-            .collect::<Vec<_>>();
-
-        Self {
-            color,
-            depth,
-            bright_pass,
-            bloom_blur_downsample,
-            bloom_blur_upsample,
-        }
-    }
-
-    fn create_render_target(
+impl RenderTarget {
+    fn new(
         device: &wgpu::Device,
         label: &str,
         width: u32,
@@ -373,9 +310,67 @@ impl RenderTargets {
             .wgpu_texture()
             .create_view(&wgpu::TextureViewDescriptor::default());
 
-        RenderTarget {
+        Self {
             texture,
             texture_view,
+        }
+    }
+}
+
+struct RenderTargets {
+    color: RenderTarget,
+    depth: RenderTarget,
+    bright_pass: RenderTarget,
+    bloom_blur_downsample: Vec<RenderTarget>,
+    bloom_blur_upsample: Vec<RenderTarget>,
+}
+
+impl RenderTargets {
+    fn new(device: &wgpu::Device, width: u32, height: u32) -> Self {
+        let color = RenderTarget::new(device, "Color Texture", width, height, HDR_TEXTURE_FORMAT);
+        let depth = RenderTarget::new(device, "Depth Texture", width, height, DEPTH_TEXTURE_FORMAT);
+        let bright_pass = RenderTarget::new(
+            device,
+            "Bright Pass Texture",
+            width,
+            height,
+            HDR_TEXTURE_FORMAT,
+        );
+
+        let base_divisor = 1;
+        let num_levels = 3;
+        let bloom_blur_downsample = (0..num_levels)
+            .map(|i| {
+                let divisor = base_divisor * 2u32.pow(1 + i); // 2, 4, 8, 16
+                RenderTarget::new(
+                    device,
+                    format!("Bloom Blur Downsample Texture {}", i).as_str(),
+                    width / divisor,
+                    height / divisor,
+                    HDR_TEXTURE_FORMAT,
+                )
+            })
+            .collect::<Vec<_>>();
+        let bloom_blur_upsample = (0..num_levels)
+            .rev()
+            .map(|i| {
+                let divisor = base_divisor * 2u32.pow(i); // 8, 4, 2, 1
+                RenderTarget::new(
+                    device,
+                    format!("Bloom Blur Upsample Texture {}", i).as_str(),
+                    width / divisor,
+                    height / divisor,
+                    HDR_TEXTURE_FORMAT,
+                )
+            })
+            .collect::<Vec<_>>();
+
+        Self {
+            color,
+            depth,
+            bright_pass,
+            bloom_blur_downsample,
+            bloom_blur_upsample,
         }
     }
 }
