@@ -27,8 +27,8 @@ pub struct ComposeRenderPass {
 impl ComposeRenderPass {
     pub fn new(
         device: &wgpu::Device,
-        color_texture_view: &wgpu::TextureView,
-        bloom_texture_view: &wgpu::TextureView,
+        color_texture: &wgpu::Texture,
+        bloom_texture: &wgpu::Texture,
         render_target_format: wgpu::TextureFormat,
     ) -> Self {
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
@@ -119,6 +119,10 @@ impl ComposeRenderPass {
             })
         };
 
+        let color_texture_view = color_texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+        let bloom_texture_view = bloom_texture.create_view(&wgpu::TextureViewDescriptor::default());
+
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: None,
             layout: &bind_group_layout,
@@ -133,11 +137,11 @@ impl ComposeRenderPass {
                 },
                 wgpu::BindGroupEntry {
                     binding: 2,
-                    resource: wgpu::BindingResource::TextureView(color_texture_view),
+                    resource: wgpu::BindingResource::TextureView(&color_texture_view),
                 },
                 wgpu::BindGroupEntry {
                     binding: 3,
-                    resource: wgpu::BindingResource::TextureView(bloom_texture_view),
+                    resource: wgpu::BindingResource::TextureView(&bloom_texture_view),
                 },
             ],
         });

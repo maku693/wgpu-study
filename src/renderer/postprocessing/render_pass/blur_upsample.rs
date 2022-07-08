@@ -4,6 +4,8 @@ use bytemuck::{bytes_of, Pod, Zeroable};
 use glam::{vec2, Vec2};
 use wgpu::util::DeviceExt;
 
+use crate::renderer::wgpu_ext;
+
 #[derive(Debug, Copy, Clone, PartialEq, Default, Pod, Zeroable)]
 #[repr(C)]
 struct Uniforms {
@@ -18,10 +20,8 @@ pub struct BlurUpsampleRenderPass {
 impl BlurUpsampleRenderPass {
     pub fn new(
         device: &wgpu::Device,
-        src_texture_view: &wgpu::TextureView,
-        render_target_format: wgpu::TextureFormat,
-        render_target_width: u32,
-        render_target_height: u32,
+        src_texture: &wgpu_ext::Texture,
+        render_target_texture: &wgpu_ext::Texture,
     ) -> Self {
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
             label: Some("Blur Upsample Bilinear Sampler"),
@@ -85,7 +85,7 @@ impl BlurUpsampleRenderPass {
                 fragment: Some(wgpu::FragmentState {
                     module: &fragment_shader_module,
                     entry_point: "main",
-                    targets: &[render_target_format.into()],
+                    targets: &[render_target_texture.format().into()],
                 }),
                 primitive: wgpu::PrimitiveState::default(),
                 depth_stencil: None,
@@ -95,7 +95,14 @@ impl BlurUpsampleRenderPass {
         };
 
         let bind_group = {
-            let resolution = vec2(render_target_width as _, render_target_height as _);
+            let src_texture_view = src_texture
+                .as_ref()
+                .create_view(&wgpu::TextureViewDescriptor::default());
+
+            let resolution = vec2(
+                render_target_texture.width() as _,
+                render_target_texture.height() as _,
+            );
             let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 label: Some("Blur Downsample Uniform Buffer"),
                 contents: bytes_of(&Uniforms { resolution }),
@@ -112,7 +119,7 @@ impl BlurUpsampleRenderPass {
                     },
                     wgpu::BindGroupEntry {
                         binding: 1,
-                        resource: wgpu::BindingResource::TextureView(src_texture_view),
+                        resource: wgpu::BindingResource::TextureView(&src_texture_view),
                     },
                     wgpu::BindGroupEntry {
                         binding: 2,

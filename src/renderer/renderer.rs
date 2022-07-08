@@ -11,6 +11,7 @@ use super::{
         AddRenderPass, BlurDownsampleRenderPass, BlurRenderPass, BlurUpsampleRenderPass,
         BrightPassRenderPass, ComposeRenderPass, CopyRenderPass,
     },
+    wgpu_ext::{self, DeviceExt},
 };
 
 const HDR_TEXTURE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba16Float;
@@ -58,67 +59,51 @@ impl Renderer {
         let render_targets = RenderTargets::new(&device, width, height);
 
         let particle_renderer = ParticleRendererBuilder::new(scene)
-            .color_target_format(HDR_TEXTURE_FORMAT)
-            .depth_format(DEPTH_TEXTURE_FORMAT)
+            .color_target_format(render_targets.color.texture.format())
+            .depth_format(render_targets.depth.texture.format())
             .build(&device);
 
         let bright_pass_render_pass = BrightPassRenderPass::new(
             &device,
-            &render_targets.color.texture_view,
-            HDR_TEXTURE_FORMAT,
+            render_targets.color.texture.wgpu_texture(),
+            render_targets.bright_pass.texture.format(),
         );
 
         let bloom_blur_downsample_render_passes = {
-            let all_blur_texture_views_but_last = render_targets
-                .bloom_blur_downsample
-                .iter()
-                .take(render_targets.bloom_blur_downsample.len() - 1);
-            let src_texture_views =
-                std::iter::once(&render_targets.bright_pass).chain(all_blur_texture_views_but_last);
+            let dst = &render_targets.bloom_blur_downsample;
 
-            src_texture_views
-                .map(|src_texture_view| {
-                    BlurDownsampleRenderPass::new(
-                        &device,
-                        &src_texture_view.texture_view,
-                        HDR_TEXTURE_FORMAT,
-                        src_texture_view.width / 2,
-                        src_texture_view.height / 2,
-                    )
+            let src =
+                std::iter::once(&render_targets.bright_pass).chain(dst.iter().take(dst.len() - 1));
+
+            std::iter::zip(src, dst)
+                .map(|(src, dst)| {
+                    BlurDownsampleRenderPass::new(&device, &src.texture, &dst.texture)
                 })
                 .collect::<Vec<_>>()
         };
 
         let bloom_blur_upsample_render_passes = {
-            let last_blur_downsample_texture_view =
-                render_targets.bloom_blur_downsample.last().into_iter();
-            let all_blur_downsample_texture_views_but_last = render_targets
-                .bloom_blur_upsample
-                .iter()
-                .take(render_targets.bloom_blur_upsample.len() - 1);
-            let src_texture_views =
-                last_blur_downsample_texture_view.chain(all_blur_downsample_texture_views_but_last);
-            src_texture_views
-                .map(|src_texture_view| {
-                    BlurUpsampleRenderPass::new(
-                        &device,
-                        &src_texture_view.texture_view,
-                        HDR_TEXTURE_FORMAT,
-                        src_texture_view.width * 2,
-                        src_texture_view.height * 2,
-                    )
-                })
+            let dst = &render_targets.bloom_blur_upsample;
+            let src = render_targets
+                .bloom_blur_downsample
+                .last()
+                .into_iter()
+                .chain(dst.iter().take(dst.len() - 1));
+
+            std::iter::zip(src, dst)
+                .map(|(src, dst)| BlurUpsampleRenderPass::new(&device, &src.texture, &dst.texture))
                 .collect::<Vec<_>>()
         };
 
         let compose_render_pass = ComposeRenderPass::new(
             &device,
-            &render_targets.color.texture_view,
-            &render_targets
+            render_targets.color.texture.wgpu_texture(),
+            render_targets
                 .bloom_blur_upsample
                 .last()
                 .unwrap()
-                .texture_view,
+                .texture
+                .wgpu_texture(),
             surface_format,
         );
 
@@ -167,18 +152,18 @@ impl Renderer {
         self.render_targets = RenderTargets::new(&self.device, width, height);
         self.bright_pass_render_pass = BrightPassRenderPass::new(
             &self.device,
-            &self.render_targets.color.texture_view,
+            self.render_targets.color.texture.wgpu_texture(),
             HDR_TEXTURE_FORMAT,
         );
         self.compose_render_pass = ComposeRenderPass::new(
             &self.device,
-            &self.render_targets.color.texture_view,
-            &self
-                .render_targets
+            self.render_targets.color.texture.wgpu_texture(),
+            self.render_targets
                 .bloom_blur_upsample
                 .last()
                 .unwrap()
-                .texture_view,
+                .texture
+                .wgpu_texture(),
             self.surface_format,
         );
     }
@@ -293,9 +278,8 @@ impl Renderer {
 }
 
 struct RenderTarget {
+    texture: wgpu_ext::Texture,
     texture_view: wgpu::TextureView,
-    width: u32,
-    height: u32,
 }
 
 struct RenderTargets {
@@ -308,21 +292,16 @@ struct RenderTargets {
 
 impl RenderTargets {
     fn new(device: &wgpu::Device, width: u32, height: u32) -> Self {
-        let color = Self::create_render_target_texture_view(
-            device,
-            "Color Texture",
-            width,
-            height,
-            HDR_TEXTURE_FORMAT,
-        );
-        let depth = Self::create_render_target_texture_view(
+        let color =
+            Self::create_render_target(device, "Color Texture", width, height, HDR_TEXTURE_FORMAT);
+        let depth = Self::create_render_target(
             device,
             "Depth Texture",
             width,
             height,
             DEPTH_TEXTURE_FORMAT,
         );
-        let bright_pass = Self::create_render_target_texture_view(
+        let bright_pass = Self::create_render_target(
             device,
             "Bright Pass Texture",
             width,
@@ -330,12 +309,12 @@ impl RenderTargets {
             HDR_TEXTURE_FORMAT,
         );
 
-        let base_divisor = 2;
-        let num_levels = 4;
+        let base_divisor = 1;
+        let num_levels = 3;
         let bloom_blur_downsample = (0..num_levels)
             .map(|i| {
                 let divisor = base_divisor * 2u32.pow(1 + i); // 2, 4, 8, 16
-                Self::create_render_target_texture_view(
+                Self::create_render_target(
                     device,
                     format!("Bloom Blur Downsample Texture {}", i).as_str(),
                     width / divisor,
@@ -348,7 +327,7 @@ impl RenderTargets {
             .rev()
             .map(|i| {
                 let divisor = base_divisor * 2u32.pow(i); // 8, 4, 2, 1
-                Self::create_render_target_texture_view(
+                Self::create_render_target(
                     device,
                     format!("Bloom Blur Upsample Texture {}", i).as_str(),
                     width / divisor,
@@ -367,14 +346,14 @@ impl RenderTargets {
         }
     }
 
-    fn create_render_target_texture_view(
+    fn create_render_target(
         device: &wgpu::Device,
         label: &str,
         width: u32,
         height: u32,
         format: wgpu::TextureFormat,
     ) -> RenderTarget {
-        let texture = device.create_texture(&wgpu::TextureDescriptor {
+        let texture = device.create_texture_ext(&wgpu::TextureDescriptor {
             label: Some(label),
             size: wgpu::Extent3d {
                 width,
@@ -387,11 +366,14 @@ impl RenderTargets {
             format,
             usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::RENDER_ATTACHMENT,
         });
-        let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+        let texture_view = texture
+            .wgpu_texture()
+            .create_view(&wgpu::TextureViewDescriptor::default());
+
         RenderTarget {
+            texture,
             texture_view,
-            width,
-            height,
         }
     }
 }

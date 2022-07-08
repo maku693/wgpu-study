@@ -29,7 +29,7 @@ pub struct BrightPassRenderPass {
 impl BrightPassRenderPass {
     pub fn new(
         device: &wgpu::Device,
-        src_texture_view: &wgpu::TextureView,
+        src_texture: &wgpu::Texture,
         color_target_format: wgpu::TextureFormat,
     ) -> Self {
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
@@ -111,6 +111,8 @@ impl BrightPassRenderPass {
             })
         };
 
+        let src_texture_view = src_texture.create_view(&wgpu::TextureViewDescriptor::default());
+
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: None,
             layout: &bind_group_layout,
@@ -125,7 +127,7 @@ impl BrightPassRenderPass {
                 },
                 wgpu::BindGroupEntry {
                     binding: 2,
-                    resource: wgpu::BindingResource::TextureView(src_texture_view),
+                    resource: wgpu::BindingResource::TextureView(&src_texture_view),
                 },
             ],
         });
