@@ -19,7 +19,6 @@ const DEPTH_TEXTURE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Fl
 
 pub struct Renderer {
     surface: wgpu::Surface,
-    surface_format: wgpu::TextureFormat,
     device: wgpu::Device,
     queue: wgpu::Queue,
     render_targets: RenderTargets,
@@ -120,7 +119,6 @@ impl Renderer {
 
         Ok(Self {
             surface,
-            surface_format,
             device,
             queue,
             render_targets,
