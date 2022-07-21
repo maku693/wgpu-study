@@ -28,4 +28,6 @@ pub struct Particle {
 pub struct Bloom {
     pub intensity: f32,
     pub threshold: f32,
+    pub scatter: f32,
+    pub iterations: u8,
 }

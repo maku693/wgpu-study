@@ -60,13 +60,15 @@ impl App {
                     max_count: 1000,
                     particle_size: 0.01,
                     position_range: (Vec3::ONE * -0.5, Vec3::ONE * 0.5),
-                    color_range: (Vec3::ONE * 1.0, Vec3::ONE * 1.0),
+                    color_range: (Vec3::ONE * 100.0, Vec3::ONE * 100.0),
                 },
             },
             post_processing: PostProcessing {
                 bloom: component::Bloom {
                     threshold: 1.0,
-                    intensity: 10.0,
+                    intensity: 1.0,
+                    iterations: 6,
+                    scatter: 0.5,
                 },
             },
         };
