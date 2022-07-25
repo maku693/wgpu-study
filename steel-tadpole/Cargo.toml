@@ -1,0 +1,21 @@
+[package]
+name = "steel-tadpole"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1"
+bytemuck = { version = "1", features = ["derive"] }
+env_logger = "0.9"
+glam = { version = "0.20", features = ["bytemuck"] }
+log = "0.4"
+pollster = "0.2"
+rand = "0.8"
+rand_pcg = "0.3"
+raw-window-handle = "0.4"
+smol = "1"
+wgpu = "0.12"
+winit = "0.26"
+
+[patch.crates-io]
+wgpu = { git = "https://github.com/gfx-rs/wgpu", branch = "master" }
