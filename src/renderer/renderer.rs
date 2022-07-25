@@ -298,7 +298,7 @@ impl RenderTargets {
         );
 
         let base_divisor = 2;
-        let num_levels = 4;
+        let num_levels = 3;
         let bloom_blur_downsample = (0..num_levels)
             .map(|i| {
                 let divisor = base_divisor * 2u32.pow(1 + i); // 2, 4, 8, 16
